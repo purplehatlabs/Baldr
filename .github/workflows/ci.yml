@@ -158,10 +158,14 @@ jobs:
       - uses: sigstore/cosign-installer@v3.8.0
 
       - name: Sign backend image
-        run: cosign sign --yes "${{ env.BACKEND_IMAGE }}:${{ github.ref_name }}"
+        env:
+          IMAGE_REF: ${{ env.BACKEND_IMAGE }}:${{ github.ref_name }}
+        run: cosign sign --yes "$IMAGE_REF"
 
       - name: Sign frontend image
-        run: cosign sign --yes "${{ env.FRONTEND_IMAGE }}:${{ github.ref_name }}"
+        env:
+          IMAGE_REF: ${{ env.FRONTEND_IMAGE }}:${{ github.ref_name }}
+        run: cosign sign --yes "$IMAGE_REF"
 
       - name: Generate backend SBOM
         uses: anchore/sbom-action@v0

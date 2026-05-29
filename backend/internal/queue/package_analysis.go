@@ -3,7 +3,7 @@ package queue
 import (
 	"bytes"
 	"context"
-	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -287,7 +287,7 @@ func packageAnalysisTaskID(payload PackageDynamicAnalysisPayload) string {
 		strings.ToLower(strings.TrimSpace(payload.PackageName)) + "|" +
 		strings.TrimSpace(payload.PackageVersion) + "|" +
 		strings.ToLower(strings.TrimSpace(payload.TriggerSignalID))
-	sum := sha1.Sum([]byte(hashInput))
+	sum := sha256.Sum256([]byte(hashInput))
 	return "package-analysis:" + hex.EncodeToString(sum[:])
 }
 

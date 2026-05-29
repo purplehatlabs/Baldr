@@ -440,12 +440,26 @@
       "description": "Indicadores executivos de exposição e capacidade de resposta."
     },
     "kpi": {
+      "needsReview": "Aguardando revisão",
+      "reachableOpen": "Alcançáveis e abertos",
       "openCritical": "Critical abertos",
       "openHigh": "High abertos",
       "slaBreachRate": "SLA breach rate",
       "criticalWithoutOwner": "Critical sem owner",
       "mttrHighPlus": "MTTR High+ (h)",
       "scanCoverage": "Scan coverage"
+    },
+    "triageFunnel": {
+      "title": "Funil de triagem por IA",
+      "description": "Da detecção à confirmação, destacando onde ainda é necessária ação humana.",
+      "stageDetected": "Detectados",
+      "stageReachable": "Alcançáveis",
+      "stageNeedsReview": "Aguardando revisão",
+      "stageConfirmed": "Confirmados",
+      "autoTriagedPct": "{{pct}}% triados automaticamente por IA",
+      "needsReviewHighlight": "{{count}} aguardando revisão humana",
+      "emptyTitle": "Nenhum achado para triagem",
+      "emptyDescription": "Execute scans para preencher o funil de triagem."
     },
     "topRepos": {
       "title": "Top repos por risco",

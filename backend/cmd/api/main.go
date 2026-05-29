@@ -18,6 +18,7 @@ import (
 	"github.com/purplehatlabs/Baldr/internal/config"
 	"github.com/purplehatlabs/Baldr/internal/db"
 	githubclient "github.com/purplehatlabs/Baldr/internal/github"
+	"github.com/purplehatlabs/Baldr/internal/llm"
 	"github.com/purplehatlabs/Baldr/internal/queue"
 	"github.com/purplehatlabs/Baldr/internal/scheduler"
 	"go.uber.org/zap"
@@ -52,10 +53,30 @@ func main() {
 		log.Fatal("create scheduler", zap.Error(err))
 	}
 
+	modelValidator := llm.NewModelValidator(cfg.LiteLLMBaseURL, cfg.LiteLLMAPIKey, log)
+	aliases := []string{cfg.LiteLLMModel}
+	if cfg.LiteLLMAgenticModel != "" {
+		aliases = append(aliases, cfg.LiteLLMAgenticModel)
+	}
+	if cfg.LiteLLMTranslationModel != "" {
+		aliases = append(aliases, cfg.LiteLLMTranslationModel)
+	}
+	modelValidator.ValidateRequiredAliases(context.Background(), aliases...)
+
+	leader, err := scheduler.NewLeaderElector(cfg.RedisURL, log)
+	if err != nil {
+		log.Fatal("create scheduler leader elector", zap.Error(err))
+	}
+	defer func() { _ = leader.Close() }()
+
 	bgCtx, bgCancel := context.WithCancel(context.Background())
 	defer bgCancel()
-	sched.Start(bgCtx)
-	defer sched.Stop()
+	go leader.Run(bgCtx, func(leadCtx context.Context) {
+		sched.StartCron(leadCtx)
+		<-leadCtx.Done()
+		sched.StopCron()
+	})
+	defer sched.Close()
 
 	tokens := auth.NewTokenService(cfg.JWTSecret)
 

@@ -65,11 +65,16 @@ func RegisterAnalysisHandlers(
 	db *pgxpool.Pool,
 	ghClient *githubclient.Client,
 	cfg *config.Config,
+	enqueuer *Enqueuer,
 	log *zap.Logger,
 ) {
 	svc := findingsvc.NewService(db, cfg, ghClient, log)
+	svc.SetBatchPollEnqueuer(enqueuer.EnqueueBatchTranslationPoll)
 	h := &validateFindingHandler{svc: svc, log: log}
 	mux.HandleFunc(TaskValidateFinding, h.Handle)
+
+	batchHandler := &batchTranslationPollHandler{svc: svc, enqueuer: enqueuer, log: log}
+	mux.HandleFunc(TaskBatchTranslationPoll, batchHandler.Handle)
 }
 
 func (h *validateFindingHandler) Handle(ctx context.Context, t *asynq.Task) error {

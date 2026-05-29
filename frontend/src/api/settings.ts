@@ -28,6 +28,9 @@ export interface LLMStatus {
   configured: boolean
   base_url?: string
   model?: string
+  agentic_model?: string
+  translation_model?: string
+  batch_enabled: boolean
   has_api_key: boolean
   timeout_seconds?: number
   auto_analysis_min_severity: 'critical' | 'high' | 'medium'
@@ -41,6 +44,9 @@ export interface LLMStatus {
 export interface UpdateLLMInput {
   base_url: string
   model: string
+  agentic_model?: string
+  translation_model?: string
+  batch_enabled?: boolean
   api_key?: string
   timeout_seconds?: number
   auto_analysis_min_severity?: 'critical' | 'high' | 'medium'

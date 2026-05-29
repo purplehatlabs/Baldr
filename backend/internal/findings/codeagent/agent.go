@@ -8,14 +8,16 @@ import (
 	"time"
 
 	"github.com/purplehatlabs/Baldr/internal/llm"
+	"go.uber.org/zap"
 )
 
 type AgentRunner struct {
 	client *llm.AgentClient
+	log    *zap.Logger
 }
 
-func NewAgentRunner(client *llm.AgentClient) *AgentRunner {
-	return &AgentRunner{client: client}
+func NewAgentRunner(client *llm.AgentClient, log *zap.Logger) *AgentRunner {
+	return &AgentRunner{client: client, log: log}
 }
 
 func (r *AgentRunner) Run(ctx context.Context, repoRoot string, bootstrap BootstrapContext) (*AgentRunResult, error) {
@@ -48,16 +50,21 @@ func (r *AgentRunner) Run(ctx context.Context, repoRoot string, bootstrap Bootst
 	}
 
 	messages := []llm.ChatMessage{
-		{Role: "system", Content: llm.BuildAgentSystemPrompt()},
-		{Role: "user", Content: llm.BuildAgentBootstrapPrompt(llmBootstrap)},
+		{Role: "system", Content: llm.BuildAgentSystemPrompt(), Cacheable: true},
+		{Role: "user", Content: llm.BuildAgentBootstrapPrompt(llmBootstrap), Cacheable: true},
 	}
 
 	trace := AgentTrace{Steps: []AgentTraceStep{}}
 	toolCalls := 0
+	var totalUsage llm.CompletionUsage
 
 	for turn := 0; turn < MaxAgentTurns; turn++ {
 		trace.Turns = turn + 1
-		assistant, err := r.client.Chat(ctx, messages, tools)
+		assistant, usage, err := r.client.Chat(ctx, messages, tools)
+		totalUsage.PromptTokens += usage.PromptTokens
+		totalUsage.CompletionTokens += usage.CompletionTokens
+		totalUsage.CacheCreationInputTokens += usage.CacheCreationInputTokens
+		totalUsage.CacheReadInputTokens += usage.CacheReadInputTokens
 		if err != nil {
 			return nil, fmt.Errorf("agent chat turn %d: %w", turn+1, err)
 		}
@@ -69,10 +76,27 @@ func (r *AgentRunner) Run(ctx context.Context, repoRoot string, bootstrap Bootst
 			}
 			analysis, err := llm.ParseAgentAnalysisResult(content)
 			if err != nil {
-				return nil, err
+				final, finalizeUsage, finalizeErr := r.client.FinalizeStructuredResult(ctx, messages)
+				totalUsage.PromptTokens += finalizeUsage.PromptTokens
+				totalUsage.CompletionTokens += finalizeUsage.CompletionTokens
+				totalUsage.CacheCreationInputTokens += finalizeUsage.CacheCreationInputTokens
+				totalUsage.CacheReadInputTokens += finalizeUsage.CacheReadInputTokens
+				if finalizeErr != nil {
+					return nil, fmt.Errorf("parse agent result: %w", err)
+				}
+				analysis = final
 			}
 			trace.ToolCalls = toolCalls
 			trace.Duration = time.Since(start).Milliseconds()
+			if r.log != nil {
+				r.log.Info("agent run completed",
+					zap.Int("turns", trace.Turns),
+					zap.Int("tool_calls", trace.ToolCalls),
+					zap.Int("prompt_tokens", totalUsage.PromptTokens),
+					zap.Int("cache_read_input_tokens", totalUsage.CacheReadInputTokens),
+					zap.Int("cache_creation_input_tokens", totalUsage.CacheCreationInputTokens),
+				)
+			}
 			return r.buildResult(analysis, trace)
 		}
 

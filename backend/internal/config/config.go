@@ -44,6 +44,9 @@ type Config struct {
 	LiteLLMBaseURL        string
 	LiteLLMAPIKey         string
 	LiteLLMModel          string
+	LiteLLMAgenticModel   string
+	LiteLLMTranslationModel string
+	LiteLLMBatchEnabled   bool
 	LiteLLMTimeoutSeconds int
 
 	PackageDynamicAnalysisEnabled        bool
@@ -70,6 +73,7 @@ func Load() *Config {
 	viper.SetDefault("LITELLM_BASE_URL", "http://localhost:4000")
 	viper.SetDefault("LITELLM_MODEL", "gpt-4o-mini")
 	viper.SetDefault("LITELLM_TIMEOUT_SECONDS", 60)
+	viper.SetDefault("LITELLM_BATCH_ENABLED", false)
 	viper.SetDefault("MALICIOUS_DATASET_URL", "https://codeload.github.com/ossf/malicious-packages/zip/refs/heads/main")
 	viper.SetDefault("MALICIOUS_DATASET_TIMEOUT_SECONDS", 120)
 	viper.SetDefault("MALICIOUS_DATASET_ENABLED", true)
@@ -111,10 +115,13 @@ func Load() *Config {
 		GuardDogBinary:    viper.GetString("GUARDDOG_BINARY"),
 		GuardDogTimeoutS:  viper.GetInt("GUARDDOG_TIMEOUT_SECONDS"),
 
-		LiteLLMBaseURL:        viper.GetString("LITELLM_BASE_URL"),
-		LiteLLMAPIKey:         viper.GetString("LITELLM_API_KEY"),
-		LiteLLMModel:          viper.GetString("LITELLM_MODEL"),
-		LiteLLMTimeoutSeconds: viper.GetInt("LITELLM_TIMEOUT_SECONDS"),
+		LiteLLMBaseURL:          viper.GetString("LITELLM_BASE_URL"),
+		LiteLLMAPIKey:           viper.GetString("LITELLM_API_KEY"),
+		LiteLLMModel:            viper.GetString("LITELLM_MODEL"),
+		LiteLLMAgenticModel:     viper.GetString("LITELLM_AGENTIC_MODEL"),
+		LiteLLMTranslationModel: viper.GetString("LITELLM_TRANSLATION_MODEL"),
+		LiteLLMBatchEnabled:     viper.GetBool("LITELLM_BATCH_ENABLED"),
+		LiteLLMTimeoutSeconds:   viper.GetInt("LITELLM_TIMEOUT_SECONDS"),
 
 		PackageDynamicAnalysisEnabled:        viper.GetBool("PACKAGE_DYNAMIC_ANALYSIS_ENABLED"),
 		PackageDynamicAnalysisEndpointURL:    viper.GetString("PACKAGE_DYNAMIC_ANALYSIS_ENDPOINT_URL"),

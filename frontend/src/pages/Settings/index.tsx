@@ -676,6 +676,9 @@ function LLMConfiguredCard({
         </p>
         <p className="text-xs text-gray-500 mt-0.5 truncate">
           {status.base_url}
+          {status.agentic_model ? ` · agentic: ${status.agentic_model}` : ''}
+          {status.translation_model ? ` · translation: ${status.translation_model}` : ''}
+          {status.batch_enabled ? ` · ${t('settings.llm.batchEnabled')}` : ''}
           {status.has_api_key ? t('settings.llm.apiKeySaved') : t('settings.llm.noApiKey')}
           {status.timeout_seconds ? t('settings.llm.timeout', { seconds: status.timeout_seconds }) : ''}
           {t('settings.llm.autoAnalysis', { severity: status.auto_analysis_min_severity })}
@@ -734,6 +737,9 @@ function LLMForm({
   const isEditing = Boolean(initial?.configured)
   const [baseUrl, setBaseUrl] = useState(initial?.base_url ?? 'http://litellm:4000')
   const [model, setModel] = useState(initial?.model ?? 'gpt-4o-mini')
+  const [agenticModel, setAgenticModel] = useState(initial?.agentic_model ?? '')
+  const [translationModel, setTranslationModel] = useState(initial?.translation_model ?? '')
+  const [batchEnabled, setBatchEnabled] = useState(initial?.batch_enabled ?? false)
   const [apiKey, setApiKey] = useState('')
   const [clearApiKey, setClearApiKey] = useState(false)
   const [timeout, setTimeout] = useState(String(initial?.timeout_seconds ?? 60))
@@ -779,6 +785,9 @@ function LLMForm({
     mutation.mutate({
       base_url: url,
       model: model.trim(),
+      agentic_model: agenticModel.trim() || undefined,
+      translation_model: translationModel.trim() || undefined,
+      batch_enabled: batchEnabled,
       api_key: apiKeyField,
       timeout_seconds: timeoutSeconds,
       auto_analysis_min_severity: autoAnalysisMinSeverity,
@@ -810,7 +819,7 @@ function LLMForm({
 
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">
-            {t('settings.llm.model')}
+            {t('settings.llm.defaultModel')}
           </label>
           <input
             type="text"
@@ -820,6 +829,35 @@ function LLMForm({
             required
             className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
           />
+          <p className="text-xs text-gray-500 mt-1">{t('settings.llm.defaultModelHint')}</p>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">
+            {t('settings.llm.agenticModel')}
+          </label>
+          <input
+            type="text"
+            value={agenticModel}
+            onChange={(e) => setAgenticModel(e.target.value)}
+            placeholder={model || 'gpt-4o-mini'}
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
+          />
+          <p className="text-xs text-gray-500 mt-1">{t('settings.llm.agenticModelHint')}</p>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">
+            {t('settings.llm.translationModel')}
+          </label>
+          <input
+            type="text"
+            value={translationModel}
+            onChange={(e) => setTranslationModel(e.target.value)}
+            placeholder={model || 'gpt-4o-mini'}
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
+          />
+          <p className="text-xs text-gray-500 mt-1">{t('settings.llm.translationModelHint')}</p>
         </div>
 
         <div>
@@ -834,6 +872,19 @@ function LLMForm({
             onChange={(e) => setTimeout(e.target.value)}
             className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
+        </div>
+
+        <div className="col-span-2">
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={batchEnabled}
+              onChange={(e) => setBatchEnabled(e.target.checked)}
+              className="rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+            />
+            {t('settings.llm.batchEnabled')}
+          </label>
+          <p className="text-xs text-gray-500 mt-1">{t('settings.llm.batchEnabledHint')}</p>
         </div>
 
         <div className="col-span-2">

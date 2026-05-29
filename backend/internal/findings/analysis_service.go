@@ -23,6 +23,12 @@ type Service struct {
 	resolver *llm.Resolver
 	github   *githubclient.Client
 	log      *zap.Logger
+	enqueueBatchPoll func(analysisID uuid.UUID) error
+}
+
+// SetBatchPollEnqueuer wires async batch translation polling.
+func (s *Service) SetBatchPollEnqueuer(fn func(analysisID uuid.UUID) error) {
+	s.enqueueBatchPoll = fn
 }
 
 // NewService builds the analysis Service. The LLM client is no longer process-wide:
@@ -33,6 +39,9 @@ func NewService(db *pgxpool.Pool, cfg *config.Config, gh *githubclient.Client, l
 		BaseURL:                 cfg.LiteLLMBaseURL,
 		APIKey:                  cfg.LiteLLMAPIKey,
 		Model:                   cfg.LiteLLMModel,
+		AgenticModel:            cfg.LiteLLMAgenticModel,
+		TranslationModel:        cfg.LiteLLMTranslationModel,
+		BatchEnabled:            cfg.LiteLLMBatchEnabled,
 		TimeoutSeconds:          cfg.LiteLLMTimeoutSeconds,
 		AutoAnalysisMinSeverity: llm.DefaultAutoAnalysisMinSeverity,
 	}
@@ -213,8 +222,8 @@ func (s *Service) RunAnalysis(ctx context.Context, analysisID uuid.UUID) error {
 	}
 	defer cleanup()
 
-	agentClient := llm.NewAgentClient(settings)
-	runner := codeagent.NewAgentRunner(agentClient)
+	agentClient := llm.NewAgentClient(settings, s.log)
+	runner := codeagent.NewAgentRunner(agentClient, s.log)
 	agentStarted := time.Now()
 	agentResult, err := runner.Run(ctx, cloneDir, buildCodeAgentBootstrap(actx))
 	if err != nil {
@@ -225,22 +234,267 @@ func (s *Service) RunAnalysis(ctx context.Context, analysisID uuid.UUID) error {
 	final := MergeWithLLM(pre, llmResult, row.Finding.Severity)
 	modelName := agentClient.ModelName()
 	promptVersion := llm.AgentPromptVersion
-	completedAt := time.Now()
+	dispatchMeta, dispatchMode := agentDispatchMeta(settings)
 
-	var reasoningPtBR, exploitationPtBR, remediationPtBR *string
-	translationClient := llm.New(settings)
-	translation, translateErr := translationClient.TranslateAnalysisToPtBR(ctx, llm.AnalysisTranslationInput{
+	translationInput := llm.AnalysisTranslationInput{
 		Reasoning:        final.Reasoning,
 		ExploitationPath: llmResult.ExploitationPath,
 		RemediationPath:  llmResult.RemediationPath,
+	}
+
+	if shouldBatchTranslate(settings, trigger) {
+		userPrompt, promptErr := llm.BuildTranslationUserPrompt(translationInput)
+		if promptErr != nil {
+			return s.failAnalysis(ctx, analysisID, promptErr)
+		}
+		batchClient := llm.NewBatchClient(settings)
+		batchID, batchErr := batchClient.SubmitTranslation(
+			ctx,
+			analysisID.String(),
+			settings.ResolveTranslationModel(),
+			llm.BuildTranslationSystemPrompt(),
+			userPrompt,
+		)
+		if batchErr != nil {
+			s.log.Warn("batch translation submit failed, falling back to realtime",
+				zap.String("analysis_id", analysisID.String()),
+				zap.Error(batchErr),
+			)
+			return s.completeAnalysis(ctx, analysisID, findingID, tenantID, final, llmResult, agentResult,
+				modelName, promptVersion, hash, translationInput, settings,
+				models.LLMDispatchBatchFallback, batchFallbackMeta("", "batch_submit_failed"))
+		}
+
+		if err := s.saveAnalysisAwaitingBatch(ctx, analysisID, findingID, tenantID, final, llmResult, agentResult,
+			modelName, promptVersion, hash, batchID, batchPendingMeta(batchID)); err != nil {
+			return s.failAnalysis(ctx, analysisID, err)
+		}
+
+		if s.enqueueBatchPoll != nil {
+			if err := s.enqueueBatchPoll(analysisID); err != nil {
+				s.log.Warn("enqueue batch translation poll",
+					zap.String("analysis_id", analysisID.String()),
+					zap.Error(err),
+				)
+			}
+		}
+
+		s.log.Info("finding agent analysis awaiting batch translation",
+			zap.String("analysis_id", analysisID.String()),
+			zap.String("finding_id", findingID.String()),
+			zap.String("batch_id", batchID),
+			zap.String("agent_dispatch_mode", string(dispatchMode)),
+			zap.Int("agent_turns", agentResult.Trace.Turns),
+			zap.Int("agent_tool_calls", agentResult.Trace.ToolCalls),
+			zap.Int64("agent_duration_ms", agentResult.Trace.Duration),
+			zap.Int64("total_duration_ms", time.Since(agentStarted).Milliseconds()),
+		)
+		return nil
+	}
+
+	return s.completeAnalysis(ctx, analysisID, findingID, tenantID, final, llmResult, agentResult,
+		modelName, promptVersion, hash, translationInput, settings, dispatchMode, dispatchMeta)
+}
+
+func (s *Service) PollBatchTranslation(ctx context.Context, analysisID uuid.UUID) error {
+	var (
+		findingID   uuid.UUID
+		tenantID    uuid.UUID
+		batchID     *string
+		dispatchMode string
+	)
+	err := s.db.QueryRow(ctx, `
+		SELECT finding_id, tenant_id, llm_batch_id, llm_dispatch_mode
+		FROM finding_analyses
+		WHERE id = $1`, analysisID,
+	).Scan(&findingID, &tenantID, &batchID, &dispatchMode)
+	if err != nil {
+		return fmt.Errorf("load analysis for batch poll: %w", err)
+	}
+	if dispatchMode != string(models.LLMDispatchBatchPending) || batchID == nil || *batchID == "" {
+		return nil
+	}
+
+	settings, err := s.resolver.Resolve(ctx, tenantID)
+	if err != nil {
+		return fmt.Errorf("resolve llm settings: %w", err)
+	}
+
+	batchClient := llm.NewBatchClient(settings)
+	status, outputFileID, err := batchClient.GetStatus(ctx, *batchID)
+	if err != nil {
+		return err
+	}
+
+	switch status {
+	case llm.BatchStatusCompleted:
+		translation, err := batchClient.GetTranslationResult(ctx, outputFileID, analysisID.String())
+		if err != nil {
+			return s.fallbackBatchTranslation(ctx, analysisID, tenantID, *batchID, "batch_result_parse_failed")
+		}
+		return s.applyBatchTranslation(ctx, analysisID, findingID, tenantID, translation, *batchID)
+	case llm.BatchStatusFailed, llm.BatchStatusExpired, llm.BatchStatusCancelled:
+		return s.fallbackBatchTranslation(ctx, analysisID, tenantID, *batchID, string(status))
+	default:
+		return ErrBatchStillPending
+	}
+}
+
+func (s *Service) fallbackBatchTranslation(ctx context.Context, analysisID, tenantID uuid.UUID, batchID, reason string) error {
+	var (
+		reasoning        string
+		exploitationPath string
+		remediationPath  string
+	)
+	err := s.db.QueryRow(ctx, `
+		SELECT reasoning, exploitation_path, remediation_path
+		FROM finding_analyses WHERE id = $1`, analysisID,
+	).Scan(&reasoning, &exploitationPath, &remediationPath)
+	if err != nil {
+		return fmt.Errorf("load analysis for batch fallback: %w", err)
+	}
+
+	settings, err := s.resolver.Resolve(ctx, tenantID)
+	if err != nil {
+		return fmt.Errorf("resolve llm settings: %w", err)
+	}
+
+	translationClient := llm.NewTranslationClient(settings)
+	translation, translateErr := translationClient.TranslateAnalysisToPtBR(ctx, llm.AnalysisTranslationInput{
+		Reasoning:        reasoning,
+		ExploitationPath: exploitationPath,
+		RemediationPath:  remediationPath,
 	})
+	if translateErr != nil {
+		return s.failAnalysis(ctx, analysisID, translateErr)
+	}
+
+	return s.finalizeAnalysis(ctx, analysisID, translation, models.LLMDispatchBatchFallback, batchFallbackMeta(batchID, reason))
+}
+
+func (s *Service) applyBatchTranslation(
+	ctx context.Context,
+	analysisID, findingID, tenantID uuid.UUID,
+	translation *llm.AnalysisTranslationResult,
+	batchID string,
+) error {
+	if err := s.finalizeAnalysis(ctx, analysisID, translation, models.LLMDispatchBatchDone, batchDoneMeta(batchID)); err != nil {
+		return err
+	}
+	prioritization := NewPrioritizationService(s.db)
+	if err := prioritization.RecalculateRiskScore(ctx, findingID, tenantID); err != nil {
+		s.log.Warn("recalculate risk score after batch translation", zap.Error(err))
+	}
+	return nil
+}
+
+func (s *Service) finalizeAnalysis(
+	ctx context.Context,
+	analysisID uuid.UUID,
+	translation *llm.AnalysisTranslationResult,
+	dispatchMode models.LLMDispatchMode,
+	dispatchMeta []byte,
+) error {
+	var reasoningPtBR, exploitationPtBR, remediationPtBR *string
+	if translation != nil {
+		if translation.Reasoning != "" {
+			reasoningPtBR = &translation.Reasoning
+		}
+		if translation.ExploitationPath != "" {
+			exploitationPtBR = &translation.ExploitationPath
+		}
+		if translation.RemediationPath != "" {
+			remediationPtBR = &translation.RemediationPath
+		}
+	}
+	completedAt := time.Now()
+	_, err := s.db.Exec(ctx, `
+		UPDATE finding_analyses SET
+			analysis_status = 'completed',
+			reasoning_pt_br = $1,
+			exploitation_path_pt_br = $2,
+			remediation_path_pt_br = $3,
+			llm_dispatch_mode = $4,
+			llm_dispatch_meta = $5,
+			completed_at = $6,
+			error_msg = NULL
+		WHERE id = $7`,
+		reasoningPtBR, exploitationPtBR, remediationPtBR,
+		dispatchMode, dispatchMeta, completedAt, analysisID,
+	)
+	return err
+}
+
+func (s *Service) saveAnalysisAwaitingBatch(
+	ctx context.Context,
+	analysisID, findingID, tenantID uuid.UUID,
+	final FinalVerdict,
+	llmResult *llm.AnalysisResult,
+	agentResult *codeagent.AgentRunResult,
+	modelName, promptVersion, inputHash, batchID string,
+	agentMeta []byte,
+) error {
+	_, err := s.db.Exec(ctx, `
+		UPDATE finding_analyses SET
+			analysis_status = 'running',
+			criticality_verdict = $1,
+			exploitability_verdict = $2,
+			confidence = $3,
+			reasoning = $4,
+			exploitation_path = $5,
+			remediation_path = $6,
+			model_name = $7,
+			prompt_version = $8,
+			input_hash = $9,
+			agent_trace_json = $10,
+			vulnerable_code_paths_json = $11,
+			llm_dispatch_mode = $12,
+			llm_dispatch_meta = $13,
+			llm_batch_id = $14
+		WHERE id = $15`,
+		final.CriticalityVerdict, final.ExploitabilityVerdict, final.Confidence,
+		final.Reasoning, llmResult.ExploitationPath, llmResult.RemediationPath,
+		modelName, promptVersion, inputHash, agentResult.AgentTraceJSON, agentResult.VulnPathsJSON,
+		models.LLMDispatchBatchPending, agentMeta, batchID, analysisID,
+	)
+	if err != nil {
+		return err
+	}
+	prioritization := NewPrioritizationService(s.db)
+	if err := prioritization.RecalculateRiskScore(ctx, findingID, tenantID); err != nil {
+		s.log.Warn("recalculate risk score after agent analysis", zap.Error(err))
+	}
+	triage := NewTriageService(s.db)
+	if err := triage.ApplyPostAnalysis(ctx, findingID, tenantID, final.CriticalityVerdict, final.Confidence); err != nil {
+		s.log.Warn("apply triage after analysis", zap.Error(err))
+	}
+	return nil
+}
+
+func (s *Service) completeAnalysis(
+	ctx context.Context,
+	analysisID, findingID, tenantID uuid.UUID,
+	final FinalVerdict,
+	llmResult *llm.AnalysisResult,
+	agentResult *codeagent.AgentRunResult,
+	modelName, promptVersion, inputHash string,
+	translationInput llm.AnalysisTranslationInput,
+	settings llm.Settings,
+	dispatchMode models.LLMDispatchMode,
+	dispatchMeta []byte,
+) error {
+	translationClient := llm.NewTranslationClient(settings)
+	translation, translateErr := translationClient.TranslateAnalysisToPtBR(ctx, translationInput)
 	if translateErr != nil {
 		s.log.Warn("translate analysis to pt-BR",
 			zap.String("analysis_id", analysisID.String()),
 			zap.String("finding_id", findingID.String()),
 			zap.Error(translateErr),
 		)
-	} else if translation != nil {
+	}
+
+	var reasoningPtBR, exploitationPtBR, remediationPtBR *string
+	if translation != nil {
 		if translation.Reasoning != "" {
 			reasoningPtBR = &translation.Reasoning
 		}
@@ -252,7 +506,8 @@ func (s *Service) RunAnalysis(ctx context.Context, analysisID uuid.UUID) error {
 		}
 	}
 
-	_, err = s.db.Exec(ctx, `
+	completedAt := time.Now()
+	_, err := s.db.Exec(ctx, `
 		UPDATE finding_analyses SET
 			analysis_status = 'completed',
 			criticality_verdict = $1,
@@ -269,14 +524,16 @@ func (s *Service) RunAnalysis(ctx context.Context, analysisID uuid.UUID) error {
 			input_hash = $12,
 			agent_trace_json = $13,
 			vulnerable_code_paths_json = $14,
-			completed_at = $15,
+			llm_dispatch_mode = $15,
+			llm_dispatch_meta = $16,
+			completed_at = $17,
 			error_msg = NULL
-		WHERE id = $16`,
+		WHERE id = $18`,
 		final.CriticalityVerdict, final.ExploitabilityVerdict, final.Confidence,
 		final.Reasoning, llmResult.ExploitationPath, llmResult.RemediationPath,
 		reasoningPtBR, exploitationPtBR, remediationPtBR,
-		modelName, promptVersion, hash, agentResult.AgentTraceJSON, agentResult.VulnPathsJSON,
-		completedAt, analysisID,
+		modelName, promptVersion, inputHash, agentResult.AgentTraceJSON, agentResult.VulnPathsJSON,
+		dispatchMode, dispatchMeta, completedAt, analysisID,
 	)
 	if err != nil {
 		return fmt.Errorf("save analysis: %w", err)
@@ -285,14 +542,13 @@ func (s *Service) RunAnalysis(ctx context.Context, analysisID uuid.UUID) error {
 	s.log.Info("finding agent analysis completed",
 		zap.String("analysis_id", analysisID.String()),
 		zap.String("finding_id", findingID.String()),
-		zap.String("trigger", string(trigger)),
 		zap.Int("agent_turns", agentResult.Trace.Turns),
 		zap.Int("agent_tool_calls", agentResult.Trace.ToolCalls),
 		zap.Int64("agent_duration_ms", agentResult.Trace.Duration),
-		zap.Int64("total_duration_ms", time.Since(agentStarted).Milliseconds()),
 		zap.Float64("confidence", final.Confidence),
 		zap.String("criticality_verdict", string(final.CriticalityVerdict)),
 		zap.String("exploitability_verdict", string(final.ExploitabilityVerdict)),
+		zap.String("llm_dispatch_mode", string(dispatchMode)),
 	)
 
 	prioritization := NewPrioritizationService(s.db)

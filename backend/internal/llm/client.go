@@ -1,11 +1,9 @@
 package llm
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -48,8 +46,25 @@ type Settings struct {
 	BaseURL                 string
 	APIKey                  string
 	Model                   string
+	DefaultModel            string
+	AgenticModel            string
+	TranslationModel        string
+	BatchEnabled            bool
+	BatchMode               string
 	TimeoutSeconds          int
 	AutoAnalysisMinSeverity models.Severity
+}
+
+func (s Settings) ResolveDefaultModel() string {
+	return firstNonEmpty(s.DefaultModel, s.Model)
+}
+
+func (s Settings) ResolveAgenticModel() string {
+	return firstNonEmpty(s.AgenticModel, s.ResolveDefaultModel())
+}
+
+func (s Settings) ResolveTranslationModel() string {
+	return firstNonEmpty(s.TranslationModel, s.ResolveDefaultModel())
 }
 
 type Client struct {
@@ -68,9 +83,15 @@ func New(s Settings) *Client {
 	return &Client{
 		baseURL:    strings.TrimRight(s.BaseURL, "/"),
 		apiKey:     s.APIKey,
-		model:      s.Model,
+		model:      s.ResolveDefaultModel(),
 		httpClient: &http.Client{Timeout: timeout},
 	}
+}
+
+func NewTranslationClient(s Settings) *Client {
+	c := New(s)
+	c.model = s.ResolveTranslationModel()
+	return c
 }
 
 func (c *Client) ModelName() string {
@@ -127,27 +148,17 @@ Details: %s`,
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/v1/chat/completions", bytes.NewReader(body))
+	req, err := newChatCompletionRequest(ctx, c.baseURL, c.apiKey, body)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
-	if c.apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+c.apiKey)
-	}
 
-	resp, err := c.httpClient.Do(req)
+	respBody, statusCode, err := doChatCompletionWithRetry(ctx, c.httpClient, req)
 	if err != nil {
-		return nil, fmt.Errorf("call litellm: %w", err)
+		return nil, err
 	}
-	defer func() { _ = resp.Body.Close() }()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
-	}
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("litellm returned %d: %s", resp.StatusCode, truncate(string(respBody), 500))
+	if statusCode >= 400 {
+		return nil, fmt.Errorf("litellm returned %d: %s", statusCode, truncate(string(respBody), 500))
 	}
 
 	content, err := extractMessageContent(respBody)

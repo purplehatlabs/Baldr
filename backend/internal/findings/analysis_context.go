@@ -50,7 +50,7 @@ func (s *Service) LoadAnalysisContext(ctx context.Context, findingID, tenantID u
 		       r.is_internet_exposed,
 		       COALESCE(r.asset_criticality, 'medium'),
 		       COALESCE(r.data_sensitivity, 'internal'),
-		       COALESCE(r.environment, 'production')
+		       COALESCE(r.environment, 'prod')
 		FROM findings f
 		JOIN manifests m ON m.id = f.manifest_id
 		JOIN repositories r ON r.id = m.repo_id

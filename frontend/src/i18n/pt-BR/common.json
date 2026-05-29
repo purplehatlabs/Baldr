@@ -158,12 +158,15 @@
       "suppress": "Suprimir",
       "reopen": "Reabrir",
       "markFixed": "Marcar como corrigido",
+      "reanalyze": "Re-analisar (IA)",
       "assign": "Assign",
       "apply": "Aplicar ação em lote",
       "applying": "Aplicando...",
       "clearSelection": "Limpar seleção",
       "assignPlaceholder": "user_id para atribuição",
-      "assignTitle": "Digite user_id para auditoria de atribuição"
+      "assignTitle": "Digite user_id para auditoria de atribuição",
+      "resultDefault": "Ação em lote aplicada em {{count}} achados.",
+      "resultReanalyze": "Reanálise enfileirada: {{enqueued}}. Já em fila/executando: {{alreadyQueued}}. Manuais ignorados: {{skippedManual}}. Falhas: {{failed}}."
     },
     "ai": {
       "title": "Análise IA",
@@ -521,6 +524,23 @@
     "scanning": "Enfileirando…",
     "scanRunning": "Em andamento…",
     "scanQueued": "Na fila…",
+    "context": {
+      "setExposureFirst": "Defina a exposição antes de editar o contexto",
+      "assetCriticality": "Criticidade do ativo",
+      "dataSensitivity": "Sensibilidade dos dados",
+      "environment": "Ambiente",
+      "criticalityLow": "Ativo: baixo",
+      "criticalityMedium": "Ativo: médio",
+      "criticalityHigh": "Ativo: alto",
+      "criticalityCritical": "Ativo: crítico",
+      "sensitivityPublic": "Dados: público",
+      "sensitivityInternal": "Dados: interno",
+      "sensitivityConfidential": "Dados: confidencial",
+      "sensitivityRestricted": "Dados: restrito",
+      "environmentDev": "Amb: dev",
+      "environmentStaging": "Amb: staging",
+      "environmentProd": "Amb: prod"
+    },
     "browse": {
       "title": "Repositórios em {{org}}",
       "subtitle": "Listados diretamente do GitHub",

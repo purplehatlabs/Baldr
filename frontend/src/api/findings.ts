@@ -141,13 +141,23 @@ export interface FindingsPage {
   total_pages: number
 }
 
-export type FindingBulkAction = 'assign' | 'suppress' | 'reopen' | 'mark_fixed'
+export type FindingBulkAction = 'assign' | 'suppress' | 'reopen' | 'mark_fixed' | 'reanalyze'
 
 export interface BulkFindingsInput {
   ids: string[]
   action: FindingBulkAction
   assignee_user_id?: string
   note?: string
+}
+
+export interface BulkFindingsResult {
+  updated: number
+  failed: number
+  action?: FindingBulkAction | string
+  reanalyze_enqueued?: number
+  reanalyze_already_queued?: number
+  reanalyze_skipped_manual?: number
+  reanalyze_failed?: number
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -261,7 +271,7 @@ export async function analyzeFinding(id: string): Promise<{ message: string; fin
   return data
 }
 
-export async function bulkUpdateFindings(input: BulkFindingsInput): Promise<{ updated: number; failed: number }> {
+export async function bulkUpdateFindings(input: BulkFindingsInput): Promise<BulkFindingsResult> {
   const { data } = await api.post('/api/v1/findings/bulk/actions', {
     action: input.action,
     finding_ids: input.ids,
@@ -273,5 +283,10 @@ export async function bulkUpdateFindings(input: BulkFindingsInput): Promise<{ up
   return {
     updated: asNumber(record?.matched_count, input.ids.length),
     failed: asNumber(record?.failed, 0),
+    action: typeof record?.action === 'string' ? record.action : input.action,
+    reanalyze_enqueued: asNumber(record?.reanalyze_enqueued, 0),
+    reanalyze_already_queued: asNumber(record?.reanalyze_already_queued, 0),
+    reanalyze_skipped_manual: asNumber(record?.reanalyze_skipped_manual, 0),
+    reanalyze_failed: asNumber(record?.reanalyze_failed, 0),
   }
 }

@@ -158,12 +158,15 @@
       "suppress": "Suppress",
       "reopen": "Reopen",
       "markFixed": "Mark as fixed",
+      "reanalyze": "Re-analyze (AI)",
       "assign": "Assign",
       "apply": "Apply bulk action",
       "applying": "Applying...",
       "clearSelection": "Clear selection",
       "assignPlaceholder": "user_id for assignment",
-      "assignTitle": "Enter user_id for assignment audit"
+      "assignTitle": "Enter user_id for assignment audit",
+      "resultDefault": "Bulk action applied to {{count}} findings.",
+      "resultReanalyze": "Re-analysis queued: {{enqueued}}. Already queued/running: {{alreadyQueued}}. Manual-only skipped: {{skippedManual}}. Failures: {{failed}}."
     },
     "ai": {
       "title": "AI Analysis",
@@ -521,6 +524,23 @@
     "scanning": "Queuing…",
     "scanRunning": "Running…",
     "scanQueued": "Queued…",
+    "context": {
+      "setExposureFirst": "Set exposure before editing context",
+      "assetCriticality": "Asset criticality",
+      "dataSensitivity": "Data sensitivity",
+      "environment": "Environment",
+      "criticalityLow": "Asset: low",
+      "criticalityMedium": "Asset: medium",
+      "criticalityHigh": "Asset: high",
+      "criticalityCritical": "Asset: critical",
+      "sensitivityPublic": "Data: public",
+      "sensitivityInternal": "Data: internal",
+      "sensitivityConfidential": "Data: confidential",
+      "sensitivityRestricted": "Data: restricted",
+      "environmentDev": "Env: dev",
+      "environmentStaging": "Env: staging",
+      "environmentProd": "Env: prod"
+    },
     "browse": {
       "title": "Repositories in {{org}}",
       "subtitle": "Listed directly from GitHub",

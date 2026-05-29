@@ -84,7 +84,13 @@ export async function listScanJobs(repoId: string): Promise<ScanJob[]> {
 
 export async function updateRepoExposure(
   repoId: string,
-  input: { is_internet_exposed: boolean; exposure_source: 'manual' | 'auto_discovery' },
+  input: {
+    is_internet_exposed: boolean
+    exposure_source: 'manual' | 'auto_discovery'
+    asset_criticality?: Repo['asset_criticality']
+    data_sensitivity?: Repo['data_sensitivity']
+    environment?: Repo['environment']
+  },
 ): Promise<void> {
   await api.patch(`/api/v1/repos/${repoId}/exposure`, input)
 }

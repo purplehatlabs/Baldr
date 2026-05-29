@@ -221,8 +221,11 @@ type blockedRepo struct {
 }
 
 type updateExposureRequest struct {
-	IsInternetExposed *bool  `json:"is_internet_exposed" binding:"required"`
-	ExposureSource    string `json:"exposure_source" binding:"required"`
+	IsInternetExposed *bool   `json:"is_internet_exposed" binding:"required"`
+	ExposureSource    string  `json:"exposure_source" binding:"required"`
+	AssetCriticality  *string `json:"asset_criticality,omitempty"`
+	DataSensitivity   *string `json:"data_sensitivity,omitempty"`
+	Environment       *string `json:"environment,omitempty"`
 }
 
 func (h *ReposHandler) updateExposure(c *gin.Context) {
@@ -242,17 +245,32 @@ func (h *ReposHandler) updateExposure(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid exposure_source"})
 		return
 	}
+	if req.AssetCriticality != nil && !isValidAssetCriticality(*req.AssetCriticality) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid asset_criticality"})
+		return
+	}
+	if req.DataSensitivity != nil && !isValidDataSensitivity(*req.DataSensitivity) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid data_sensitivity"})
+		return
+	}
+	if req.Environment != nil && !isValidEnvironment(*req.Environment) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid environment"})
+		return
+	}
 
 	result, err := h.db.Exec(c.Request.Context(), `
 		UPDATE repositories r
 		SET is_internet_exposed = $1,
 		    exposure_source = $2,
+		    asset_criticality = COALESCE($3, r.asset_criticality),
+		    data_sensitivity = COALESCE($4, r.data_sensitivity),
+		    environment = COALESCE($5, r.environment),
 		    exposure_updated_at = NOW()
 		FROM organizations o
-		WHERE r.id = $3
+		WHERE r.id = $6
 		  AND o.id = r.org_id
-		  AND o.tenant_id = $4`,
-		*req.IsInternetExposed, req.ExposureSource, repoID, claims.TenantID,
+		  AND o.tenant_id = $7`,
+		*req.IsInternetExposed, req.ExposureSource, req.AssetCriticality, req.DataSensitivity, req.Environment, repoID, claims.TenantID,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
@@ -264,6 +282,33 @@ func (h *ReposHandler) updateExposure(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+func isValidAssetCriticality(value string) bool {
+	switch value {
+	case "low", "medium", "high", "critical":
+		return true
+	default:
+		return false
+	}
+}
+
+func isValidDataSensitivity(value string) bool {
+	switch value {
+	case "public", "internal", "confidential", "restricted":
+		return true
+	default:
+		return false
+	}
+}
+
+func isValidEnvironment(value string) bool {
+	switch value {
+	case "dev", "staging", "prod":
+		return true
+	default:
+		return false
+	}
 }
 
 func (h *ReposHandler) listJobs(c *gin.Context) {

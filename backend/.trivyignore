@@ -1,0 +1,13 @@
+# Trivy ignore file — exceções documentadas para o scan da imagem do backend.
+#
+# CVE-2026-34040 — github.com/docker/docker (Moby): authorization bypass.
+# Dependência TRANSITIVA, arrastada apenas pelo osv-scanner, que é o núcleo do
+# scanner do Baldr:
+#   internal/scanner -> github.com/google/osv-scanner/v2
+#     -> github.com/google/osv-scalibr -> github.com/docker/docker/client
+# Não há correção aplicável via Go: o módulo github.com/docker/docker só é
+# publicado até v28.5.2+incompatible; o "fix 29.3.1" reportado é a versão do
+# Moby, não uma versão importável do módulo. O `go mod why` confirma que o
+# módulo principal não usa o pacote diretamente.
+# Remover esta exceção quando o osv-scanner/osv-scalibr atualizar o docker client.
+CVE-2026-34040

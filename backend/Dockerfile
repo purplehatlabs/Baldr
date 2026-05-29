@@ -21,7 +21,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o bin/worker ./cmd/worker
 RUN CGO_ENABLED=0 GOOS=linux go build -o bin/migrate ./cmd/migrate
 
 # Production
-FROM alpine:3.19 AS production
+FROM alpine:3.22 AS production
 RUN apk add --no-cache ca-certificates git
 WORKDIR /app
 COPY --from=builder /app/bin/api ./api

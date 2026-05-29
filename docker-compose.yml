@@ -1,0 +1,124 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-devsecops}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devsecops}
+      POSTGRES_DB: ${POSTGRES_DB:-devsecops}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-devsecops}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: dev
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-devsecops}:${POSTGRES_PASSWORD:-devsecops}@postgres:5432/${POSTGRES_DB:-devsecops}?sslmode=disable
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/app
+      - go_cache:/root/go/pkg/mod
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: air -c .air.toml
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-stable
+    env_file:
+      - .env
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm_config.yaml:/app/config.yaml:ro
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+    profiles:
+      - litellm
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: dev
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-devsecops}:${POSTGRES_PASSWORD:-devsecops}@postgres:5432/${POSTGRES_DB:-devsecops}?sslmode=disable
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - ./backend:/app
+      - go_cache:/root/go/pkg/mod
+      - /tmp/scan-workdir:/tmp/scan-workdir
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: air -c .air.worker.toml
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: dev
+    restart: unless-stopped
+    environment:
+      # Proxy target for Vite dev server (runs inside this container — use Docker DNS).
+      VITE_PROXY_TARGET: http://backend:8080
+      VITE_DEV_AUTH_ENABLED: ${VITE_DEV_AUTH_ENABLED:-false}
+      VITE_GITHUB_SSO_ENABLED: ${VITE_GITHUB_SSO_ENABLED:-true}
+      VITE_GOOGLE_SSO_ENABLED: ${VITE_GOOGLE_SSO_ENABLED:-true}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - node_modules:/app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  redis_data:
+  go_cache:
+  node_modules:

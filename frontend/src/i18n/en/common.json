@@ -1,0 +1,773 @@
+{
+  "app": {
+    "name": "DevSecOps"
+  },
+  "nav": {
+    "overview": "Posture",
+    "triage": "Triage",
+    "manualVulnerabilities": "Manual vulns",
+    "projects": "Projects",
+    "repositories": "Repositories",
+    "scans": "Scans",
+    "supplyChainSignals": "Supply Chain Signals",
+    "teams": "Teams",
+    "policies": "Policies",
+    "integrations": "Integrations",
+    "settings": "Settings"
+  },
+  "layout": {
+    "projectDetails": "Project Details",
+    "defaultTitle": "DevSecOps"
+  },
+  "header": {
+    "logout": "Sign out"
+  },
+  "login": {
+    "tagline": "Dependency vulnerability analysis for your entire organization",
+    "title": "Sign in to the platform",
+    "githubHint": "Use your corporate GitHub account",
+    "googleHint": "Use your corporate Google account",
+    "continueGithub": "Continue with GitHub",
+    "continueGoogle": "Continue with Google",
+    "or": "or",
+    "terms": "By signing in, you agree to the platform terms of use.",
+    "devMode": "Development mode — do not use in production",
+    "emailPlaceholder": "email@example.com",
+    "namePlaceholder": "Your name",
+    "devLogin": "Sign in (dev)",
+    "devLoggingIn": "Signing in…",
+    "devLoginError": "Login failed. Check that DEV_AUTH_ENABLED=true on the backend.",
+    "features": {
+      "ecosystems": "Ecosystems",
+      "vulnerabilities": "Vulnerabilities",
+      "database": "Database"
+    }
+  },
+  "settings": {
+    "language": {
+      "title": "Language",
+      "description": "Choose the interface language. Your preference is saved to your account.",
+      "label": "Display language",
+      "en": "English",
+      "ptBR": "Portuguese (Brazil)",
+      "saved": "Language updated.",
+      "saveError": "Could not update language."
+    },
+    "orgs": {
+      "title": "GitHub Organizations",
+      "description": "Connect GitHub organizations by installing the GitHub App and providing the Installation ID.",
+      "connect": "Connect org",
+      "empty": "No organizations connected.",
+      "appInstalled": "App installed",
+      "appNotInstalled": "App not installed",
+      "syncMembers": "Sync members",
+      "removeOrg": "Remove organization",
+      "syncFailed": "Failed to sync members.",
+      "syncSuccess": "Synced: {{orgMembers}} org members, {{teamLinks}} team links, {{teams}} teams processed.",
+      "newOrg": "New organization",
+      "orgLogin": "Organization login *",
+      "installationId": "GitHub App Installation ID",
+      "scanCron": "Scan cron",
+      "scanCronHint": "(default: every night at 2 AM)",
+      "connectError": "Failed to connect organization. Check the data and try again."
+    },
+    "githubApp": {
+      "title": "GitHub App",
+      "description": "Configure the GitHub App used to scan repositories.",
+      "descriptionFull": "App ID + Private Key (PEM) used to scan your repositories. The key is encrypted (AES-256-GCM) before being stored.",
+      "configured": "Configured",
+      "replace": "Replace",
+      "removeConfig": "Remove configuration",
+      "appIdRequired": "App ID must be numeric.",
+      "invalidPem": "Invalid PEM file — expected a \"BEGIN ... PRIVATE KEY\" block.",
+      "saveFailed": "Failed to save.",
+      "appId": "App ID *",
+      "privateKey": "Private Key (PEM) *",
+      "selectPem": "Select .pem file",
+      "loaded": "Loaded ({{bytes}} bytes)",
+      "pemHint": "You can paste the PEM content or select the file. We never send the key back.",
+      "saveGithubApp": "Save GitHub App",
+      "setupSteps": [
+        "Create a GitHub App at github.com/settings/apps/new with read permissions on Contents, Metadata, and Pull requests.",
+        "Note the App ID (\"App ID\" field at the top of the App page).",
+        "Generate a private key (\"Generate a private key\") — a .pem file is downloaded.",
+        "Upload the .pem file and App ID on this page.",
+        "Install the App on your GitHub organization, note the Installation ID, and connect it in the section below."
+      ]
+    },
+    "llm": {
+      "title": "LLM Configuration",
+      "description": "Configure the LLM provider used for AI vulnerability analysis.",
+      "titleFull": "LLM (LiteLLM / OpenAI)",
+      "descriptionFull": "OpenAI Chat Completions-compatible endpoint used to analyze findings. Automatic analysis runs only for severities at or above the configured threshold. The API key is encrypted (AES-256-GCM) before being stored.",
+      "configured": "Configured",
+      "apiKeySaved": " · API key saved",
+      "noApiKey": " · no API key",
+      "timeout": " · timeout {{seconds}}s",
+      "autoAnalysis": " · auto-analysis ≥ {{severity}}",
+      "baseUrlRequired": "base_url must start with http:// or https://",
+      "timeoutRange": "timeout_seconds must be between 5 and 600",
+      "baseUrl": "Base URL *",
+      "baseUrlHint": "OpenAI-compatible endpoint (without the `/v1/chat/completions` suffix).",
+      "model": "Model *",
+      "timeoutLabel": "Timeout (seconds)",
+      "autoAnalysisFrom": "Automatic analysis from",
+      "autoAnalysisCritical": "Critical",
+      "autoAnalysisHigh": "High and Critical",
+      "autoAnalysisMedium": "Medium, High and Critical",
+      "autoAnalysisHint": "Findings below this threshold remain in manual triage without running the LLM agent automatically after the scan.",
+      "apiKey": "API Key",
+      "apiKeyKeep": "(leave blank to keep current)",
+      "apiKeyNoChange": "••••••••  (do not change)",
+      "clearApiKey": "Remove saved API key (use endpoint without authentication)",
+      "saveLlm": "Save LLM"
+    }
+  },
+  "findings": {
+    "filters": {
+      "allSeverities": "All severities",
+      "allStatuses": "All statuses",
+      "allReachability": "All reachability",
+      "allRiskTiers": "All risk tiers",
+      "allSources": "All sources",
+      "allTriage": "All triage",
+      "pendingTriage": "Pending (new + review)",
+      "allTeams": "All teams",
+      "allRepos": "All repositories",
+      "slaBreach": "SLA breach"
+    },
+    "severity": {
+      "critical": "Critical",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "unknown": "Unknown"
+    },
+    "status": {
+      "open": "Open",
+      "suppressed": "Suppressed",
+      "fixed": "Fixed"
+    },
+    "triage": {
+      "new": "New (no decision)",
+      "needsReview": "Awaiting review",
+      "confirmed": "Confirmed",
+      "dismissed": "Dismissed"
+    },
+    "bulk": {
+      "suppress": "Suppress",
+      "reopen": "Reopen",
+      "markFixed": "Mark as fixed",
+      "assign": "Assign",
+      "apply": "Apply bulk action",
+      "applying": "Applying...",
+      "clearSelection": "Clear selection",
+      "assignPlaceholder": "user_id for assignment",
+      "assignTitle": "Enter user_id for assignment audit"
+    },
+    "ai": {
+      "title": "AI Analysis",
+      "reanalyze": "Re-analyze",
+      "analyzing": "Analyzing...",
+      "notRunBelowThreshold": "Automatic analysis was not run — severity {{severity}} is below the configured threshold ({{minSeverity}} or higher). This finding remains in manual triage. Use Re-analyze to force an on-demand analysis.",
+      "notRunYet": "AI analysis has not run yet. Click Re-analyze to validate criticality and exploitability.",
+      "failed": "Analysis failed: {{error}}",
+      "unknownError": "unknown error",
+      "policySkip": "Automatic analysis skipped by tenant policy: {{reason}}",
+      "skipped": "Analysis skipped.",
+      "inProgress": "Analysis in progress...",
+      "confidence": "Confidence: {{value}}%",
+      "reasoning": "Reasoning",
+      "exploitation": "How exploitation occurs",
+      "remediation": "Remediation path",
+      "vulnerablePaths": "Vulnerable code paths"
+    },
+    "sort": {
+      "riskScore": "Risk score",
+      "lastSeen": "Last seen",
+      "firstSeen": "First seen",
+      "severity": "Severity",
+      "status": "Status",
+      "cvss": "CVSS",
+      "package": "Package"
+    },
+    "reachability": {
+      "all": "All reachability",
+      "reachable": "Reachable",
+      "unreachable": "Unreachable",
+      "unknown": "Unknown"
+    },
+    "riskTier": {
+      "all": "All risk tiers",
+      "critical": "Critical",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "source": {
+      "all": "All sources",
+      "osv": "Scanner (OSV)",
+      "manual": "Manual",
+      "dataset": "Dataset",
+      "guarddog": "GuardDog",
+      "openssf_pa": "OpenSSF PA"
+    },
+    "searchPlaceholder": "Search by package, OSV, repository, or manifest",
+    "repoFilter": "Repository:",
+    "clearRepoFilter": "Clear repository filter",
+    "sortOrder": "Order: {{order}}",
+    "sortDesc": "Desc",
+    "sortAsc": "Asc",
+    "count_other": "{{count}} findings",
+    "savedViews": "Saved views",
+    "viewNamePlaceholder": "View name",
+    "saveNewView": "Save new",
+    "updateView": "Update view",
+    "removeView": "Remove view",
+    "emptyTitle": "No findings found",
+    "emptyDescription": "No vulnerability matches the selected filters.",
+    "columns": {
+      "risk": "Risk",
+      "severity": "Severity",
+      "package": "Package",
+      "source": "Source",
+      "osvId": "OSV ID",
+      "repository": "Repository",
+      "manifest": "Manifest",
+      "reachability": "Reachability",
+      "triage": "Triage",
+      "exploitable": "Exploitable",
+      "status": "Status"
+    },
+    "tenantCatalog": "Tenant catalog",
+    "detail": {
+      "summary": "Summary",
+      "noDescription": "No description.",
+      "source": "Source",
+      "osvId": "OSV ID",
+      "cvss": "CVSS",
+      "riskScore": "Risk score",
+      "reachability": "Reachability",
+      "slaDue": "SLA due",
+      "slaBreach": "SLA breach",
+      "affectedVersion": "Affected version",
+      "fixedVersion": "Fixed version",
+      "repository": "Repository",
+      "manifest": "Manifest",
+      "externalSource": "External source",
+      "businessImpact": "Business impact",
+      "whyScore": "Why this score?",
+      "reachabilityEvidence": "Reachability evidence",
+      "matchedIn": "Matched in: {{paths}}",
+      "noEvidence": "No additional evidence",
+      "owners": "Owners",
+      "noOwners": "No owners mapped. Sync org memberships and scan the repository.",
+      "teamsCodeowners": "Teams (CODEOWNERS)",
+      "noTeams": "No teams mapped by CODEOWNERS for manifest {{manifest}}.",
+      "status": "Status",
+      "suppress": "Suppress",
+      "details": "Details",
+      "viewOsv": "View on OSV.dev"
+    },
+    "triageSection": {
+      "title": "Triage",
+      "decidedAt": "Decided on {{date}}",
+      "confirm": "Confirm vulnerability",
+      "dismiss": "False positive (suppress)",
+      "reopenAdmin": "Reopen triage (admin)",
+      "confirmedHint": "Finding confirmed — enters the operational queue (Top Risks) and remediation.",
+      "updateError": "Failed to update triage"
+    },
+    "triageBadge": {
+      "new": "New",
+      "needsReview": "Review",
+      "confirmed": "Confirmed",
+      "dismissed": "Dismissed",
+      "ai": "AI"
+    },
+    "riskScore": {
+      "title": "Risk score",
+      "partialHint": "Partial score — awaiting contextual agent analysis (code + exposure). Scanner severity alone does not define final risk.",
+      "contextualHint": "Contextual score calculated with inferred exploitability in code, reachability, exposure, and threat intel.",
+      "baselineHint": "Score based on available signals so far.",
+      "partial": "partial",
+      "sla": "SLA"
+    },
+    "criticality": {
+      "true_critical": "Confirmed critical",
+      "false_positive": "False positive",
+      "informational": "Informational",
+      "needs_human_review": "Human review"
+    },
+    "exploitability": {
+      "pending": "Pending",
+      "error": "Error",
+      "na": "N/A",
+      "none": "Not exploitable",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "critical": "Critical"
+    },
+    "sourceBadge": {
+      "osv": "OSV",
+      "manual": "Manual",
+      "dataset": "Dataset",
+      "guarddog": "GuardDog",
+      "openssf_pa": "OpenSSF"
+    },
+    "count_one": "{{count}} finding"
+  },
+  "common": {
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "updatedAt": "Updated at {{value}}",
+    "saving": "Saving...",
+    "close": "Close",
+    "yes": "Yes",
+    "no": "No",
+    "all": "All",
+    "search": "Search",
+    "clearSearch": "Clear search",
+    "refresh": "Refresh",
+    "updating": "Updating…",
+    "previous": "Previous",
+    "next": "Next",
+    "page": "Page {{page}}",
+    "pageOf": "Page {{page}} of {{total}}",
+    "showing": "Showing {{from}}–{{to}} of {{total}}",
+    "perPage": "{{count}} / page",
+    "open": "Open",
+    "edit": "Edit",
+    "remove": "Remove",
+    "clear": "Clear",
+    "tryAgain": "Try again",
+    "actions": "Actions",
+    "detail": "Detail",
+    "back": "Back",
+    "confirm": "Confirm",
+    "removing": "Removing…",
+    "connecting": "Connecting…",
+    "connect": "Connect",
+    "selected": "{{count}} selected",
+    "selected_one": "{{count}} selected",
+    "loaded": "{{count}} loaded",
+    "morePages": " • more pages available",
+    "updatingInline": " • updating…",
+    "ofLoaded": " (of {{total}})",
+    "notAvailable": "Not available",
+    "exposure": {
+      "internet": "Internet",
+      "internal": "Internal",
+      "unclassified": "Unclassified",
+      "markInternet": "Mark as internet-exposed",
+      "markInternal": "Mark as internal use",
+      "classification": "Exposure classification"
+    }
+  },
+  "shared": {
+    "scanStatus": {
+      "never": "Never scanned",
+      "pending": "Queued",
+      "running": "Running",
+      "completed": "Completed",
+      "failed": "Failed"
+    },
+    "scanTrigger": {
+      "manual": "Manual",
+      "scheduled": "Scheduled",
+      "webhook": "Webhook"
+    },
+    "severity": {
+      "critical": "Critical",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "unknown": "Unknown"
+    },
+    "findingStatus": {
+      "open": "Open",
+      "suppressed": "Suppressed",
+      "fixed": "Fixed"
+    }
+  },
+  "overview": {
+    "globalPosture": {
+      "title": "Global posture",
+      "description": "Executive indicators of exposure and response capacity."
+    },
+    "kpi": {
+      "openCritical": "Open critical",
+      "openHigh": "Open high",
+      "slaBreachRate": "SLA breach rate",
+      "criticalWithoutOwner": "Critical without owner",
+      "mttrHighPlus": "MTTR High+ (h)",
+      "scanCoverage": "Scan coverage"
+    },
+    "topRepos": {
+      "title": "Top repos by risk",
+      "description": "Repositories with the highest concentration of exposure.",
+      "emptyTitle": "No repos with open findings",
+      "emptyDescription": "Run scans to generate repository rankings.",
+      "viewAll": "View projects",
+      "crit": "{{count}} crit",
+      "high": "{{count}} high",
+      "sla": "{{count}} SLA",
+      "reachable": "{{count}} reachable",
+      "internet": "Internet",
+      "unclassified": "Unclassified"
+    },
+    "topTeams": {
+      "title": "Top teams by risk",
+      "description": "Teams with the largest backlog and SLA breaches.",
+      "emptyTitle": "No teams with open findings",
+      "emptyDescription": "Teams are detected via CODEOWNERS after scans.",
+      "viewAll": "View teams",
+      "slaRate": "SLA {{rate}}%"
+    },
+    "topRisks": {
+      "title": "Top risks (findings)",
+      "description": "Confirmed findings with the highest risk score — immediate action.",
+      "viewTriage": "View triage",
+      "emptyTitle": "No priority risks",
+      "emptyDescription": "Run scans and confirm findings in triage to generate prioritization."
+    },
+    "remediation": {
+      "title": "Remediation (30 days)",
+      "description": "Volume of new findings vs. fixed — indicates whether the backlog is growing or shrinking.",
+      "loadingTrend": "Loading trend…",
+      "emptyTitle": "No recent activity",
+      "emptyDescription": "New findings and fixes will appear here after scans and remediations.",
+      "newFindings": "New findings",
+      "fixed": "Fixed",
+      "netBalance": "Net balance",
+      "backlogGrowing": "Backlog growing",
+      "backlogShrinking": "Backlog shrinking",
+      "stable": "Stable",
+      "last14Days": "Last 14 days",
+      "chartNew": "New",
+      "chartFixed": "Fixed",
+      "backlogCriticalHigh": "Backlog critical+high: ",
+      "slaBreach": " · SLA breach {{rate}}%"
+    }
+  },
+  "projects": {
+    "emptyTitle": "No projects found",
+    "emptyDescription": "Connect integrations and run onboarding to start monitoring projects.",
+    "count": "{{count}} projects",
+    "columns": {
+      "project": "Project",
+      "lastScan": "Last scan",
+      "open": "Open",
+      "critical": "Critical",
+      "high": "High",
+      "detail": "Detail"
+    }
+  },
+  "projectDetail": {
+    "invalidTitle": "Invalid project",
+    "invalidDescription": "The project identifier was not provided.",
+    "notFoundTitle": "Project not found",
+    "notFoundDescription": "Could not load the requested project details.",
+    "subtitle": "Operational summary of the project and its main risk signals.",
+    "fields": {
+      "defaultBranch": "Default Branch",
+      "archived": "Archived",
+      "openFindings": "Open Findings",
+      "criticalFindings": "Critical Findings",
+      "highFindings": "High Findings",
+      "fixedFindings": "Fixed Findings",
+      "lastScan": "Last Scan"
+    },
+    "identifiers": "Identifiers",
+    "repo": "Repo"
+  },
+  "repositories": {
+    "activeScans": "{{pending}} queued · {{running}} running",
+    "viewScanQueue": "View scan queue",
+    "scanEnqueueError": "Failed to enqueue scan.",
+    "rescanConfirm": "Re-scan all {{count}} repositories {{scope}}?",
+    "rescanScopeOrg": "in the selected organization",
+    "rescanScopeAll": "across all organizations",
+    "rescanResult": "{{enqueued}} of {{total}} repositories enqueued.{{blocked}}{{skipped}}",
+    "rescanBlocked": " {{count}} blocked due to missing classification.",
+    "rescanSkipped": " {{count}} were already queued or running.",
+    "organization": "Organization:",
+    "exposure": "Exposure:",
+    "exposurePending": "Unclassified",
+    "rescanAll": "Re-scan all",
+    "rescanAllTitle": "Enqueue scan for all imported repositories",
+    "browseGithub": "Browse GitHub",
+    "browseDisabledNoOrg": "Connect an org with Installation ID to browse",
+    "browseTitle": "List repositories directly from GitHub",
+    "emptyTitle": "No repositories found",
+    "emptyDescription": "Connect a GitHub organization in Settings to start monitoring repositories.",
+    "configureOrg": "Configure organization",
+    "count": "{{count}} repositories",
+    "columns": {
+      "repository": "Repository",
+      "branch": "Branch",
+      "scanStatus": "Scan status",
+      "exposure": "Exposure",
+      "type": "Type",
+      "actions": "Actions"
+    },
+    "monorepo": "monorepo",
+    "viewFindings": "View findings for this repository",
+    "scanBlockedExposure": "Set exposure to enable scanning",
+    "scanAlreadyActive": "Scan already queued or running",
+    "scan": "Scan",
+    "scanning": "Queuing…",
+    "scanRunning": "Running…",
+    "scanQueued": "Queued…",
+    "browse": {
+      "title": "Repositories in {{org}}",
+      "subtitle": "Listed directly from GitHub",
+      "syncTitle": "Import all repos to the database (without scanning)",
+      "syncing": "Syncing…",
+      "syncAll": "Sync all",
+      "filterPlaceholder": "Filter loaded repositories",
+      "loadError": "Failed to load repositories.",
+      "noFilterMatch": "No repositories match the filter.",
+      "noReposInOrg": "No repositories found in this organization.",
+      "selectAllVisible": "Select all visible",
+      "language": "Language",
+      "status": "Status",
+      "action": "Action",
+      "private": "private",
+      "scannedAt": "Scanned on {{date}}",
+      "tracked": "Tracked",
+      "new": "New",
+      "scanBlockedClassify": "Classify exposure before scanning",
+      "loadingMore": "Loading more…",
+      "loadMore": "Load more",
+      "loadedFooter": "{{count}} loaded{{ofLoaded}}{{morePages}}{{updating}}",
+      "clearSelection": "Clear",
+      "scanSelected": "Scan selected",
+      "queueingSelected": "Queuing {{count}}…",
+      "batchLimit": "Limit of {{max}} repositories per batch.",
+      "batchEnqueued": "{{count}} scan(s) enqueued{{suffix}}.",
+      "batchFailed": "{{count}} failed",
+      "batchBlocked": "{{count}} blocked by exposure",
+      "batchSkipped": "{{count}} already queued or running",
+      "syncResult": "Sync: {{imported}} new, {{updated}} updated (total {{total}}).",
+      "syncError": "Failed to sync with GitHub.",
+      "selected_one": "{{count}} selected"
+    }
+  },
+  "scans": {
+    "activeScans": "{{pending}} queued · {{running}} running",
+    "statusLabel": "Status:",
+    "statusAll": "All",
+    "statusPending": "Queued",
+    "statusRunning": "Running",
+    "statusCompleted": "Completed",
+    "statusFailed": "Failed",
+    "repositoryLabel": "Repository:",
+    "viewRepositories": "View repositories →",
+    "emptyTitle": "No scans found",
+    "emptyDescription": "Queued and completed scans will appear here.",
+    "count": "{{count}} scans",
+    "columns": {
+      "repository": "Repository",
+      "status": "Status",
+      "source": "Source",
+      "started": "Started",
+      "completed": "Completed",
+      "error": "Error"
+    }
+  },
+  "supplyChainSignals": {
+    "summary": {
+      "total": "Total signals",
+      "open": "Open",
+      "criticalHigh": "Critical + High"
+    },
+    "searchPlaceholder": "Search by package, version, repository, or signal key",
+    "filters": {
+      "allStatuses": "All statuses",
+      "allTypes": "All types",
+      "allEngines": "All engines",
+      "allRepos": "All repositories"
+    },
+    "status": {
+      "open": "Open",
+      "triaged": "Triaged",
+      "suppressed": "Suppressed",
+      "resolved": "Resolved"
+    },
+    "signalType": {
+      "malicious_package": "Malicious package",
+      "typosquat": "Typosquat",
+      "dependency_confusion": "Dependency confusion",
+      "suspicious_behavior": "Suspicious behavior"
+    },
+    "engine": {
+      "dataset": "dataset",
+      "guarddog": "guarddog",
+      "openssf_pa": "openssf_pa",
+      "manual": "manual"
+    },
+    "count_other": "{{count}} signals",
+    "loadError": "Failed to load supply chain signals.",
+    "emptyTitle": "No signals found",
+    "emptyDescription": "No supply chain signal matches the selected filters.",
+    "columns": {
+      "package": "Package",
+      "version": "Version",
+      "ecosystem": "Ecosystem",
+      "type": "Type",
+      "severity": "Severity",
+      "engine": "Engine",
+      "status": "Status",
+      "repo": "Repo",
+      "lastSeen": "Last seen"
+    },
+    "detailUnavailable": "Detail endpoint unavailable. Showing list item data.",
+    "fields": {
+      "signalKey": "Signal key",
+      "signalType": "Signal type",
+      "status": "Status",
+      "engine": "Engine",
+      "ecosystem": "Ecosystem",
+      "repository": "Repository",
+      "lastSeen": "Last seen",
+      "confidence": "Confidence"
+    },
+    "reasoning": "Reasoning",
+    "noReasoning": "No reasoning available.",
+    "evidenceJson": "Evidence JSON",
+    "count_one": "{{count}} signal"
+  },
+  "manualVulnerabilities": {
+    "accessDeniedTitle": "Access restricted",
+    "accessDeniedDescription": "Only administrators and owners can register manual vulnerabilities.",
+    "title": "Manual vulnerability",
+    "description": "Register findings from pentest, bug bounty, or external tools in the tenant catalog.",
+    "createError": "Failed to create vulnerability",
+    "validationRequired": "Summary and external identifier are required.",
+    "fields": {
+      "summary": "Summary *",
+      "summaryPlaceholder": "e.g. SQL injection on login endpoint",
+      "severity": "Severity *",
+      "externalId": "External identifier (CVE/GHSA) *",
+      "package": "Package (optional)",
+      "version": "Version (optional)",
+      "externalSource": "External source",
+      "selectSource": "Select source",
+      "slaDue": "SLA due (optional)",
+      "businessImpact": "Business impact",
+      "businessImpactPlaceholder": "Describe operational or regulatory impact",
+      "details": "Details",
+      "detailsPlaceholder": "Additional context, reproduction steps, links...",
+      "evidence": "Evidence (text or JSON)",
+      "evidencePlaceholder": "{\"url\":\"https://...\",\"screenshot\":\"...\"} or free text"
+    },
+    "sources": {
+      "bug_bounty": "Bug bounty",
+      "pentest": "Pentest",
+      "vendor_advisory": "Vendor advisory",
+      "internal_audit": "Internal audit",
+      "other": "Other"
+    },
+    "creating": "Creating...",
+    "create": "Create manual vulnerability"
+  },
+  "teams": {
+    "emptyTitle": "No teams found",
+    "emptyDescription": "Teams are detected automatically from CODEOWNERS files in scanned repositories.",
+    "detected_other": "{{count}} teams detected via CODEOWNERS",
+    "noFindings": "No findings",
+    "tabs": {
+      "members": "Members",
+      "findings": "Findings"
+    },
+    "loadingMembers": "Loading members…",
+    "noMembers": "No members synced. Sync memberships in Settings → GitHub Organizations.",
+    "linkedUser": "Linked user",
+    "loadingFindings": "Loading findings…",
+    "noOpenFindings": "No open findings.",
+    "columns": {
+      "severity": "Severity",
+      "package": "Package",
+      "osvId": "OSV ID",
+      "repoManifest": "Repository / Manifest",
+      "fix": "Fix"
+    },
+    "detected_one": "{{count}} team detected via CODEOWNERS"
+  },
+  "policies": {
+    "title": "Policies",
+    "description": "Triage rules for severity, minimum risk score, and SLA using `/api/v1/policies`.",
+    "newPolicy": "New policy",
+    "createTitle": "Create policy",
+    "editTitle": "Edit {{name}}",
+    "emptyTitle": "No policies created",
+    "emptyDescription": "Create rules to standardize minimum severity and remediation SLA.",
+    "columns": {
+      "name": "Name",
+      "minSeverity": "Min severity",
+      "minRiskScore": "Min risk score",
+      "slaHours": "SLA (hours)",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "active": "Active",
+    "inactive": "Inactive",
+    "form": {
+      "name": "Name *",
+      "description": "Description",
+      "minSeverity": "Minimum severity",
+      "minRiskScore": "Minimum risk score (0–100)",
+      "slaHours": "SLA (hours)",
+      "enabled": "Policy enabled"
+    }
+  },
+  "integrations": {
+    "title": "Integrations",
+    "description": "Functional configuration for Slack, Jira, and GitHub checks using integration endpoints.",
+    "close": "Close",
+    "slackUpdated": "Slack updated successfully.",
+    "slackError": "Failed to update Slack integration.",
+    "jiraUpdated": "Jira updated successfully.",
+    "jiraError": "Failed to update Jira integration.",
+    "checksUpdated": "GitHub Checks updated successfully.",
+    "checksError": "Failed to update GitHub Checks.",
+    "slack": {
+      "title": "Slack",
+      "webhookUrl": "Webhook URL",
+      "defaultChannel": "Default channel",
+      "enabled": "Integration active"
+    },
+    "jira": {
+      "title": "Jira",
+      "baseUrl": "Base URL",
+      "projectKey": "Project key",
+      "email": "Email",
+      "apiToken": "API token",
+      "keepToken": "(leave blank to keep)",
+      "enabled": "Integration active"
+    },
+    "githubChecks": {
+      "title": "GitHub Checks",
+      "checkName": "Check name",
+      "defaultBranchOnly": "Default branch only",
+      "enabled": "Integration active"
+    },
+    "clear": "Clear"
+  },
+  "dashboard": {
+    "severity": {
+      "critical": "Critical",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "fixed": "Fixed"
+    },
+    "monitoredRepos": "Monitored repositories",
+    "openFindings": "Open findings",
+    "findingsBySeverity": "Findings by severity",
+    "emptyChart": "No findings yet. Configure an organization and run a scan."
+  }
+}

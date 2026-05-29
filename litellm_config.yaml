@@ -1,0 +1,12 @@
+litellm_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  drop_params: true
+
+general_settings:
+  drop_params: true
+  master_key: os.environ/LITELLM_MASTER_KEY
+  disable_spend_logs: false
+  disable_error_logs: false
+  store_prompts_in_spend_logs: true
+  maximum_spend_logs_retention_period: "7d"
+  maximum_spend_logs_retention_interval: "1d"

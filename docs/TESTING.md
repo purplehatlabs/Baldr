@@ -218,6 +218,33 @@ cd backend
 go test -tags integration -count=1 ./...
 ```
 
+## Local git hooks
+
+Install once to mirror CI before commit/push:
+
+```bash
+make install-hooks
+```
+
+| Hook | Make target | What it runs | ~Time |
+|---|---|---|---|
+| `pre-commit` | `make pre-commit` | `go vet`, `golangci-lint`, ESLint, `tsc`, gitleaks (staged) | 20–60s |
+| `pre-push` | `make pre-push` | `go build`, `go test`, `govulncheck`, `tsc`, Vitest | 1–3 min |
+
+Run manually anytime:
+
+```bash
+make pre-commit    # fast lint/typecheck
+make pre-push      # full CI unit-test parity
+make security-check  # optional: OSV, licenses, Semgrep (security.yml)
+```
+
+**Prerequisites:** Go 1.26.3 (`GOTOOLCHAIN=auto`), `golangci-lint` v2.11.4, `cd frontend && npm ci`, and optionally [gitleaks](https://github.com/gitleaks/gitleaks) for staged secret scanning (free CLI — no license needed locally).
+
+**Bypass once:** `git commit --no-verify` or `git push --no-verify` when you intentionally skip hooks.
+
+Docker image scans (Trivy) and release signing run only on version tags in CI — not included in local hooks.
+
 ## Fixtures and test data
 
 For tests that need data in the database, create SQL fixtures:

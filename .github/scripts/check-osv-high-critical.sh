@@ -6,6 +6,9 @@ set -euo pipefail
 
 results_file="${1:?usage: check-osv-high-critical.sh <osv-results.json>}"
 
+total="$(jq '[.results[]?.packages[]?.vulnerabilities[]?] | length' "$results_file")"
+echo "OSV-Scanner reported $total total vulnerabilities."
+
 count="$(jq '[.results[]?.packages[]?.vulnerabilities[]?
   | select(.database_specific.severity == "HIGH" or .database_specific.severity == "CRITICAL")
 ] | length' "$results_file")"

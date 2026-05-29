@@ -245,3 +245,7 @@ require (
 	www.velocidex.com/golang/go-ntfs v0.2.0 // indirect
 	www.velocidex.com/golang/regparser v0.0.0-20250203141505-31e704a67ef7 // indirect
 )
+
+// runtime-spec v1.3.0 changed LinuxPids.Limit to *int64; containerd v1.7.x still
+// assigns int64 (compiled on linux via osv-scalibr). Pin until containerd 1.7.33+.
+replace github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.2.1

@@ -15,10 +15,10 @@ import (
 )
 
 var (
-	ErrMembershipNotFound = errors.New("tenant membership not found")
-	ErrMembershipInactive = errors.New("tenant membership is inactive")
-	ErrInviteNotFound     = errors.New("tenant invite not found")
-	ErrInviteExpired      = errors.New("tenant invite expired")
+	ErrMembershipNotFound  = errors.New("tenant membership not found")
+	ErrMembershipInactive  = errors.New("tenant membership is inactive")
+	ErrInviteNotFound      = errors.New("tenant invite not found")
+	ErrInviteExpired       = errors.New("tenant invite expired")
 	ErrInviteEmailMismatch = errors.New("invite email does not match authenticated user")
 )
 
@@ -175,7 +175,6 @@ func (s *MembershipStore) UpdateMember(ctx context.Context, tenantID, membership
 	if status != nil {
 		setParts = append(setParts, "status = $"+itoa(argIdx))
 		args = append(args, *status)
-		argIdx++
 	}
 
 	query := "UPDATE tenant_memberships SET " + strings.Join(setParts, ", ") +
@@ -230,13 +229,13 @@ func NewInviteStore(db *pgxpool.Pool) *InviteStore {
 }
 
 type InviteListItem struct {
-	ID        uuid.UUID          `json:"id"`
-	Email     string             `json:"email"`
-	Role      models.UserRole    `json:"role"`
+	ID        uuid.UUID           `json:"id"`
+	Email     string              `json:"email"`
+	Role      models.UserRole     `json:"role"`
 	Status    models.InviteStatus `json:"status"`
-	ExpiresAt time.Time          `json:"expires_at"`
-	CreatedAt time.Time          `json:"created_at"`
-	InviteURL string             `json:"invite_url,omitempty"`
+	ExpiresAt time.Time           `json:"expires_at"`
+	CreatedAt time.Time           `json:"created_at"`
+	InviteURL string              `json:"invite_url,omitempty"`
 }
 
 func (s *InviteStore) Create(ctx context.Context, tenantID, invitedBy uuid.UUID, email string, role models.UserRole, frontendBaseURL string) (*InviteListItem, error) {

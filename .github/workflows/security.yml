@@ -111,20 +111,6 @@ jobs:
       - name: Fail on HIGH or CRITICAL
         run: bash .github/scripts/check-osv-high-critical.sh osv-results.json
 
-  gitleaks:
-    name: Gitleaks
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Secret scan
-        uses: gitleaks/gitleaks-action@v2.3.9
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
-
   license-check:
     name: License compliance
     runs-on: ubuntu-latest

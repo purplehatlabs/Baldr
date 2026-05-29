@@ -146,18 +146,19 @@ export default function FindingsPage() {
   const queryClient = useQueryClient()
   const repoId = searchParams.get('repo_id') ?? ''
   const repoName = searchParams.get('repo_name') ?? ''
+  const [initialUrlFilters] = useState(() => parseInitialUrlFilters(searchParams, isTriagePage))
 
-  const [severity, setSeverity] = useState<Severity | ''>('')
-  const [status, setStatus] = useState<FindingStatus | ''>('open')
-  const [teamId, setTeamId] = useState('')
+  const [severity, setSeverity] = useState<Severity | ''>(initialUrlFilters.severity)
+  const [status, setStatus] = useState<FindingStatus | ''>(initialUrlFilters.status)
+  const [teamId, setTeamId] = useState(initialUrlFilters.teamId)
   const [qInput, setQInput] = useState('')
   const [q, setQ] = useState('')
-  const [sort, setSort] = useState<FindingSortField>('risk_score')
-  const [order, setOrder] = useState<SortOrder>('desc')
-  const [reachability, setReachability] = useState<ReachabilityStatus | ''>('')
-  const [riskTier, setRiskTier] = useState<RiskTier | ''>('')
-  const [slaBreachedOnly, setSlaBreachedOnly] = useState(false)
-  const [triageFilter, setTriageFilter] = useState<TriageStatus | '' | 'pending'>(isTriagePage ? 'pending' : '')
+  const [sort, setSort] = useState<FindingSortField>(initialUrlFilters.sort)
+  const [order, setOrder] = useState<SortOrder>(initialUrlFilters.order)
+  const [reachability, setReachability] = useState<ReachabilityStatus | ''>(initialUrlFilters.reachability)
+  const [riskTier, setRiskTier] = useState<RiskTier | ''>(initialUrlFilters.riskTier)
+  const [slaBreachedOnly, setSlaBreachedOnly] = useState(initialUrlFilters.slaBreachedOnly)
+  const [triageFilter, setTriageFilter] = useState<TriageStatus | '' | 'pending'>(initialUrlFilters.triageFilter)
   const [sourceEngine, setSourceEngine] = useState<SourceEngine | ''>('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
@@ -237,7 +238,6 @@ export default function FindingsPage() {
       updateFindingStatus(id, newStatus),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['findings'] })
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       setSelectedId(null)
     },
   })
@@ -248,7 +248,6 @@ export default function FindingsPage() {
       setSelectedIds(new Set())
       setBulkFeedback(buildBulkFeedbackMessage(result, t))
       queryClient.invalidateQueries({ queryKey: ['findings'] })
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 
@@ -1219,7 +1218,6 @@ function TriageSection({
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['finding', findingId] })
     queryClient.invalidateQueries({ queryKey: ['findings'] })
-    queryClient.invalidateQueries({ queryKey: ['dashboard'] })
   }
 
   const confirmMutation = useMutation({
@@ -1797,6 +1795,43 @@ function asSortOrder(value: unknown): SortOrder {
 function asPageSize(value: unknown): number {
   if (typeof value === 'number' && [10, 20, 50, 100].includes(value)) return value
   return 20
+}
+
+function parseInitialUrlFilters(
+  searchParams: URLSearchParams,
+  isTriagePage: boolean,
+): {
+  severity: Severity | ''
+  status: FindingStatus
+  teamId: string
+  sort: FindingSortField
+  order: SortOrder
+  reachability: ReachabilityStatus | ''
+  riskTier: RiskTier | ''
+  slaBreachedOnly: boolean
+  triageFilter: TriageStatus | '' | 'pending'
+} {
+  const triageStatusParam = searchParams.get('triage_status')
+  const triageFilter =
+    triageStatusParam === 'pending'
+      ? 'pending'
+      : triageStatusParam
+        ? asTriageStatus(triageStatusParam)
+        : isTriagePage
+          ? 'pending'
+          : ''
+
+  return {
+    severity: asSeverity(searchParams.get('severity')),
+    status: asStatus(searchParams.get('status')) || 'open',
+    teamId: searchParams.get('team_id') ?? '',
+    sort: asSortField(searchParams.get('sort')),
+    order: asSortOrder(searchParams.get('order')),
+    reachability: asReachability(searchParams.get('reachability')),
+    riskTier: asRiskTier(searchParams.get('risk_tier')),
+    slaBreachedOnly: searchParams.get('sla_breached') === 'true',
+    triageFilter,
+  }
 }
 
 function buildBulkFeedbackMessage(

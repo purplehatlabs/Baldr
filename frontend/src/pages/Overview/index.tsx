@@ -14,8 +14,10 @@ import {
   Activity,
   AlertTriangle,
   ChevronRight,
+  Crosshair,
   FolderKanban,
   GitBranch,
+  Inbox,
   ShieldCheck,
   TrendingDown,
   TrendingUp,
@@ -68,13 +70,28 @@ export default function OverviewPage() {
 
   return (
     <div className="space-y-6">
+      <TriageFunnel overview={overview} />
+
       {/* Executive KPIs */}
       <section>
         <SectionHeader
           title={t('overview.globalPosture.title')}
           description={t('overview.globalPosture.description')}
         />
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 mt-4">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 mt-4">
+          <KpiCard
+            label={t('overview.kpi.needsReview')}
+            value={overview.needs_review}
+            icon={Inbox}
+            href="/triage?triage_status=needs_review&status=open"
+          />
+          <KpiCard
+            label={t('overview.kpi.reachableOpen')}
+            value={overview.reachable_open}
+            icon={Crosshair}
+            href="/triage?reachability=reachable&status=open"
+            accent="warning"
+          />
           <KpiCard
             label={t('overview.kpi.openCritical')}
             value={overview.open_critical}
@@ -90,17 +107,17 @@ export default function OverviewPage() {
             accent="warning"
           />
           <KpiCard
+            label={t('overview.kpi.criticalWithoutOwner')}
+            value={overview.critical_without_owner}
+            icon={Users}
+            href="/triage?severity=critical&status=open"
+          />
+          <KpiCard
             label={t('overview.kpi.slaBreachRate')}
             value={`${(overview.sla_breach_rate * 100).toFixed(1)}%`}
             icon={AlertTriangle}
             href="/triage?sla_breached=true&status=open"
             accent="danger"
-          />
-          <KpiCard
-            label={t('overview.kpi.criticalWithoutOwner')}
-            value={overview.critical_without_owner}
-            icon={Users}
-            href="/triage?severity=critical&status=open"
           />
           <KpiCard
             label={t('overview.kpi.mttrHighPlus')}
@@ -259,6 +276,115 @@ export default function OverviewPage() {
 
       <RemediationTrendSection trend={trend} loading={isLoadingTrend} />
     </div>
+  )
+}
+
+function TriageFunnel({
+  overview,
+}: {
+  overview: {
+    total_findings: number
+    reachable_open: number
+    needs_review: number
+    confirmed_total: number
+    auto_triaged_rate: number
+  }
+}) {
+  const { t } = useTranslation()
+
+  const stages = [
+    {
+      key: 'detected',
+      label: t('overview.triageFunnel.stageDetected'),
+      value: overview.total_findings,
+      colorClass: 'bg-gray-400',
+      href: '/triage?status=open',
+    },
+    {
+      key: 'reachable',
+      label: t('overview.triageFunnel.stageReachable'),
+      value: overview.reachable_open,
+      colorClass: 'bg-amber-500',
+      href: '/triage?reachability=reachable&status=open',
+    },
+    {
+      key: 'needs_review',
+      label: t('overview.triageFunnel.stageNeedsReview'),
+      value: overview.needs_review,
+      colorClass: 'bg-orange-500',
+      href: '/triage?triage_status=needs_review&status=open',
+    },
+    {
+      key: 'confirmed',
+      label: t('overview.triageFunnel.stageConfirmed'),
+      value: overview.confirmed_total,
+      colorClass: 'bg-red-600',
+      href: '/triage?triage_status=confirmed',
+    },
+  ]
+
+  const toWidthPercentage = (value: number): number => {
+    if (overview.total_findings === 0 || value <= 0) return 0
+    return Math.min(100, Math.max((value / overview.total_findings) * 100, 6))
+  }
+
+  return (
+    <section className="bg-white rounded-xl border border-gray-200 p-6">
+      <SectionHeader
+        title={t('overview.triageFunnel.title')}
+        description={t('overview.triageFunnel.description')}
+      />
+
+      {overview.total_findings === 0 ? (
+        <div className="mt-4">
+          <EmptyState
+            icon={Inbox}
+            title={t('overview.triageFunnel.emptyTitle')}
+            description={t('overview.triageFunnel.emptyDescription')}
+          />
+        </div>
+      ) : (
+        <div className="mt-4 space-y-3">
+          {stages.map((stage) => (
+            <Link
+              key={stage.key}
+              to={stage.href}
+              className="group block rounded-lg border border-gray-100 px-3 py-2 hover:border-gray-200 hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="font-medium text-gray-700 group-hover:text-gray-900">
+                  {stage.label}
+                </span>
+                <span className="font-semibold text-gray-900">{stage.value}</span>
+              </div>
+              <div className="mt-2 h-2 rounded-full bg-gray-100 overflow-hidden">
+                <div
+                  className={cn('h-full rounded-full', stage.colorClass)}
+                  style={{ width: `${toWidthPercentage(stage.value)}%` }}
+                />
+              </div>
+            </Link>
+          ))}
+
+          <div className="rounded-lg border border-brand-100 bg-brand-50/60 px-4 py-3 text-sm text-brand-900 flex flex-wrap items-center gap-2">
+            <span>
+              {t('overview.triageFunnel.autoTriagedPct', {
+                pct: (overview.auto_triaged_rate * 100).toFixed(1),
+              })}
+            </span>
+            <span className="text-brand-400">·</span>
+            <Link
+              to="/triage?triage_status=needs_review&status=open"
+              className="font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-2"
+            >
+              {t('overview.triageFunnel.needsReviewHighlight', {
+                count: overview.needs_review,
+              })}
+            </Link>
+          </div>
+        </div>
+      )}
+    </section>
   )
 }
 

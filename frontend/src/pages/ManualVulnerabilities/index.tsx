@@ -51,7 +51,6 @@ export default function ManualVulnerabilitiesPage() {
     mutationFn: (payload: CreateManualFindingInput) => createManualFinding(payload),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['findings'] })
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       navigate(`/triage?finding_id=${result.id}`)
     },
     onError: (err: unknown) => {

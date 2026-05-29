@@ -7,6 +7,14 @@ export interface OverviewMetrics {
   sla_breach_rate: number
   scan_coverage_rate: number
   critical_without_owner: number
+  total_findings: number
+  needs_review: number
+  auto_triaged: number
+  auto_triaged_rate: number
+  noise_reduction_rate: number
+  confirmed_total: number
+  dismissed_total: number
+  reachable_open: number
 }
 
 export interface MetricTrendPoint {

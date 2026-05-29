@@ -36,6 +36,14 @@ type metricsOverviewResponse struct {
 	SLABreachRate        float64 `json:"sla_breach_rate"`
 	ScanCoverageRate     float64 `json:"scan_coverage_rate"`
 	CriticalWithoutOwner int     `json:"critical_without_owner"`
+	TotalFindings        int     `json:"total_findings"`
+	NeedsReview          int     `json:"needs_review"`
+	AutoTriaged          int     `json:"auto_triaged"`
+	AutoTriagedRate      float64 `json:"auto_triaged_rate"`
+	NoiseReductionRate   float64 `json:"noise_reduction_rate"`
+	ConfirmedTotal       int     `json:"confirmed_total"`
+	DismissedTotal       int     `json:"dismissed_total"`
+	ReachableOpen        int     `json:"reachable_open"`
 }
 
 func (h *MetricsHandler) overview(c *gin.Context) {
@@ -51,7 +59,7 @@ func (h *MetricsHandler) overview(c *gin.Context) {
 				AND r.is_archived = FALSE
 		),
 		tenant_findings AS (
-			SELECT f.id, f.severity, f.status, f.first_seen_at, f.last_seen_at
+			SELECT f.id, f.severity, f.status, f.first_seen_at, f.last_seen_at, f.triage_status, f.triage_decision_source, f.reachability_status
 			FROM findings f
 			WHERE f.tenant_id = $1
 		),
@@ -94,7 +102,17 @@ func (h *MetricsHandler) overview(c *gin.Context) {
 					SELECT 1 FROM finding_teams ft WHERE ft.finding_id = tf.id
 				)
 				THEN 1 ELSE 0
-			END), 0) AS critical_without_owner
+			END), 0) AS critical_without_owner,
+			COUNT(*) AS total_findings,
+			COALESCE(SUM(CASE WHEN tf.triage_status = 'needs_review' THEN 1 ELSE 0 END), 0) AS needs_review,
+			COALESCE(SUM(CASE WHEN tf.triage_decision_source = 'auto_ai' THEN 1 ELSE 0 END), 0) AS auto_triaged,
+			COALESCE(SUM(CASE WHEN tf.triage_decision_source = 'auto_ai' THEN 1 ELSE 0 END)::numeric
+				/ NULLIF(COUNT(*)::numeric, 0), 0) AS auto_triaged_rate,
+			COALESCE(1 - (SUM(CASE WHEN tf.triage_status = 'needs_review' THEN 1 ELSE 0 END)::numeric
+				/ NULLIF(COUNT(*)::numeric, 0)), 0) AS noise_reduction_rate,
+			COALESCE(SUM(CASE WHEN tf.triage_status = 'confirmed' THEN 1 ELSE 0 END), 0) AS confirmed_total,
+			COALESCE(SUM(CASE WHEN tf.triage_status = 'dismissed' THEN 1 ELSE 0 END), 0) AS dismissed_total,
+			COALESCE(SUM(CASE WHEN tf.status = 'open' AND tf.reachability_status = 'reachable' THEN 1 ELSE 0 END), 0) AS reachable_open
 		FROM tenant_findings tf`,
 		claims.TenantID,
 	).Scan(
@@ -104,6 +122,14 @@ func (h *MetricsHandler) overview(c *gin.Context) {
 		&resp.SLABreachRate,
 		&resp.ScanCoverageRate,
 		&resp.CriticalWithoutOwner,
+		&resp.TotalFindings,
+		&resp.NeedsReview,
+		&resp.AutoTriaged,
+		&resp.AutoTriagedRate,
+		&resp.NoiseReductionRate,
+		&resp.ConfirmedTotal,
+		&resp.DismissedTotal,
+		&resp.ReachableOpen,
 	)
 	if err != nil {
 		h.log.Error("metrics overview", zap.Error(err))

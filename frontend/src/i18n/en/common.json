@@ -440,12 +440,26 @@
       "description": "Executive indicators of exposure and response capacity."
     },
     "kpi": {
+      "needsReview": "Awaiting review",
+      "reachableOpen": "Reachable & open",
       "openCritical": "Open critical",
       "openHigh": "Open high",
       "slaBreachRate": "SLA breach rate",
       "criticalWithoutOwner": "Critical without owner",
       "mttrHighPlus": "MTTR High+ (h)",
       "scanCoverage": "Scan coverage"
+    },
+    "triageFunnel": {
+      "title": "AI triage funnel",
+      "description": "From detection to confirmation, highlighting where human action is still needed.",
+      "stageDetected": "Detected",
+      "stageReachable": "Reachable",
+      "stageNeedsReview": "Needs review",
+      "stageConfirmed": "Confirmed",
+      "autoTriagedPct": "{{pct}}% auto-triaged by AI",
+      "needsReviewHighlight": "{{count}} awaiting human review",
+      "emptyTitle": "No findings to triage",
+      "emptyDescription": "Run scans to populate the triage funnel."
     },
     "topRepos": {
       "title": "Top repos by risk",

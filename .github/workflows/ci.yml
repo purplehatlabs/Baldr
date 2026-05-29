@@ -12,6 +12,7 @@ permissions:
   packages: write
 
 env:
+  GOTOOLCHAIN: auto
   REGISTRY: ghcr.io
   BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/baldr-backend
   FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/baldr-frontend

@@ -13,6 +13,9 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  GOTOOLCHAIN: auto
+
 jobs:
   lint-go:
     name: golangci-lint
@@ -95,6 +98,7 @@ jobs:
           scan-args: |-
             --lockfile=backend/go.mod
             --lockfile=frontend/package-lock.json
+            --no-call-analysis=go
             --format=json
             --output=osv-results.json
 

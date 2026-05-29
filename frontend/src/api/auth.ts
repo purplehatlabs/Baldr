@@ -39,12 +39,20 @@ export async function logout(): Promise<void> {
   await api.post('/auth/logout')
 }
 
-export function getGoogleLoginURL(): string {
-  return '/auth/google'
+function withNextQuery(path: string, nextPath?: string): string {
+  if (!nextPath) {
+    return path
+  }
+
+  return `${path}?next=${encodeURIComponent(nextPath)}`
 }
 
-export function getGitHubLoginURL(): string {
-  return '/auth/github'
+export function getGoogleLoginURL(nextPath?: string): string {
+  return withNextQuery('/auth/google', nextPath)
+}
+
+export function getGitHubLoginURL(nextPath?: string): string {
+  return withNextQuery('/auth/github', nextPath)
 }
 
 export function isGitHubSSOEnabled(): boolean {

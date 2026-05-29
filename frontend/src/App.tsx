@@ -14,6 +14,7 @@ import RepositoriesPage from '@/pages/Repositories'
 import ScansPage from '@/pages/Scans'
 import SupplyChainSignalsPage from '@/pages/SupplyChainSignals'
 import ManualVulnerabilitiesPage from '@/pages/ManualVulnerabilities'
+import { buildLoginPath, popPostLoginRedirect } from '@/lib/postLoginRedirect'
 
 function FindingsRedirect() {
   const location = useLocation()
@@ -22,6 +23,7 @@ function FindingsRedirect() {
 
 function ProtectedRoutes() {
   const { isAuthenticated, isLoading } = useAuth()
+  const location = useLocation()
 
   if (isLoading) {
     return (
@@ -32,10 +34,16 @@ function ProtectedRoutes() {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />
+    const nextPath = `${location.pathname}${location.search}${location.hash}`
+    return <Navigate to={buildLoginPath(nextPath)} replace />
   }
 
   return <AppLayout />
+}
+
+function HomeRedirect() {
+  const nextPath = popPostLoginRedirect()
+  return <Navigate to={nextPath ?? '/overview'} replace />
 }
 
 export default function App() {
@@ -44,7 +52,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route element={<ProtectedRoutes />}>
-          <Route path="/" element={<Navigate to="/overview" replace />} />
+          <Route path="/" element={<HomeRedirect />} />
           <Route path="/overview" element={<OverviewPage />} />
           <Route path="/triage" element={<FindingsPage />} />
           <Route path="/projects" element={<ProjectsPage />} />

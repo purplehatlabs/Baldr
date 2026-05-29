@@ -25,7 +25,7 @@
 
 [![Baldr dashboard — ranked, explainable findings](docs/assets/dashboard.png)](docs/assets/dashboard.png)
 
-<sub><i>The Baldr dashboard: thousands of raw findings distilled into a ranked, explainable queue. (Replace with a real screenshot — see <code>docs/assets/</code>.)</i></sub>
+<sub><i>The Baldr dashboard: thousands of raw findings distilled into a ranked, explainable queue.</i></sub>
 
 </div>
 

@@ -69,7 +69,7 @@ func TestTenantSecurity_CrossTenantAccessDenied(t *testing.T) {
 	})
 	dashboard.Register(router, func(c *gin.Context) { c.Next() })
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/dashboard/overview", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/dashboard", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
@@ -299,24 +299,27 @@ func seedTenantSecurityData(ctx context.Context, pool *pgxpool.Pool, tenantA, te
 	now := time.Now()
 	for _, spec := range []struct {
 		tenantID, userID, orgID uuid.UUID
-		email, slug            string
-		role                   models.UserRole
-		orgLogin               string
+		email, slug             string
+		role                    models.UserRole
+		orgLogin                string
 	}{
 		{tenantA, userA, orgA, "user-a@test.local", "tenant-a", models.RoleAdmin, "org-a"},
 		{tenantB, userB, orgB, "user-b@test.local", "tenant-b", models.RoleAdmin, "org-b"},
 	} {
+		tenantSlug := spec.slug + "-" + spec.tenantID.String()[:8]
 		if _, err := pool.Exec(ctx, `
 			INSERT INTO tenants (id, name, slug, created_at) VALUES ($1, $2, $3, $4)`,
-			spec.tenantID, spec.slug, spec.slug, now,
+			spec.tenantID, tenantSlug, tenantSlug, now,
 		); err != nil {
 			return err
 		}
+		email := spec.email + "+" + spec.userID.String()[:8]
 		devGoogleID := "dev:" + spec.userID.String()
+		orgLogin := spec.orgLogin + "-" + spec.orgID.String()[:8]
 		if _, err := pool.Exec(ctx, `
 			INSERT INTO users (id, tenant_id, email, google_id, name, avatar_url, role, auth_provider, created_at)
 			VALUES ($1, $2, $3, $4, $5, '', $6, 'dev', $7)`,
-			spec.userID, spec.tenantID, spec.email, devGoogleID, spec.email, spec.role, now,
+			spec.userID, spec.tenantID, email, devGoogleID, email, spec.role, now,
 		); err != nil {
 			return err
 		}
@@ -330,7 +333,7 @@ func seedTenantSecurityData(ctx context.Context, pool *pgxpool.Pool, tenantA, te
 		if _, err := pool.Exec(ctx, `
 			INSERT INTO organizations (id, tenant_id, github_org_login, created_at)
 			VALUES ($1, $2, $3, $4)`,
-			spec.orgID, spec.tenantID, spec.orgLogin, now,
+			spec.orgID, spec.tenantID, orgLogin, now,
 		); err != nil {
 			return err
 		}
@@ -351,12 +354,30 @@ func seedMultiTenantUser(ctx context.Context, pool *pgxpool.Pool, userID, tenant
 		{tenantA, "multi-a", models.RoleAdmin},
 		{tenantB, "multi-b", models.RoleMember},
 	} {
+		tenantSlug := spec.slug + "-" + spec.tenantID.String()[:8]
 		if _, err := pool.Exec(ctx,
 			`INSERT INTO tenants (id, name, slug, created_at) VALUES ($1, $2, $3, $4)`,
-			spec.tenantID, spec.slug, spec.slug, now,
+			spec.tenantID, tenantSlug, tenantSlug, now,
 		); err != nil {
 			return err
 		}
+	}
+
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO users (id, tenant_id, email, google_id, name, avatar_url, role, auth_provider, created_at)
+		VALUES ($1, $2, $3, $4, $5, '', $6, 'dev', $7)`,
+		userID, tenantA, email, devGoogleID, email, models.RoleAdmin, now,
+	); err != nil {
+		return err
+	}
+
+	for _, spec := range []struct {
+		tenantID uuid.UUID
+		role     models.UserRole
+	}{
+		{tenantA, models.RoleAdmin},
+		{tenantB, models.RoleMember},
+	} {
 		if _, err := pool.Exec(ctx, `
 			INSERT INTO tenant_memberships (tenant_id, user_id, role, status, token_version, created_at, updated_at)
 			VALUES ($1, $2, $3, 'active', 1, $4, $4)`,
@@ -366,10 +387,5 @@ func seedMultiTenantUser(ctx context.Context, pool *pgxpool.Pool, userID, tenant
 		}
 	}
 
-	_, err := pool.Exec(ctx, `
-		INSERT INTO users (id, tenant_id, email, google_id, name, avatar_url, role, auth_provider, created_at)
-		VALUES ($1, $2, $3, $4, $5, '', $6, 'dev', $7)`,
-		userID, tenantA, email, devGoogleID, email, models.RoleAdmin, now,
-	)
-	return err
+	return nil
 }

@@ -1,30 +1,104 @@
-# Baldr
+<div align="center">
+
+# 🛡️ Baldr
+
+### Stop drowning in vulnerabilities. Fix the 2% that can actually hurt you.
+
+**Open-source AppSec platform that uses an LLM agent to read your code and tell you which of your thousands of dependency vulnerabilities are *actually reachable and exploitable* — so your team triages what matters instead of chasing CVSS scores.**
 
 [![CI](https://github.com/purplehatlabs/Baldr/actions/workflows/ci.yml/badge.svg)](https://github.com/purplehatlabs/Baldr/actions/workflows/ci.yml)
 [![Security](https://github.com/purplehatlabs/Baldr/actions/workflows/security.yml/badge.svg)](https://github.com/purplehatlabs/Baldr/actions/workflows/security.yml)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](LICENSE)
+[![Self-hosted](https://img.shields.io/badge/deploy-self--hosted-success.svg)](#quick-start)
+
+[Quick start](#quick-start) · [How it works](#how-baldr-cuts-the-noise) · [Features](#features) · [Docs](#additional-documentation)
+
+</div>
+
+<!--
+  📸 SCREENSHOT / DEMO
+  Replace the placeholder below with a real dashboard screenshot or demo GIF.
+  Recommended: a wide (≈1280px) shot of the ranked findings queue, or a short GIF
+  of a scan → triage flow. Drop the asset in docs/assets/ and update the path.
+-->
+<div align="center">
+
+[![Baldr dashboard — ranked, explainable findings](docs/assets/dashboard.png)](docs/assets/dashboard.png)
+
+<sub><i>The Baldr dashboard: thousands of raw findings distilled into a ranked, explainable queue. (Replace with a real screenshot — see <code>docs/assets/</code>.)</i></sub>
+
+</div>
 
 > *In Norse mythology, Baldr was slain by a single overlooked dependency — a mistletoe Frigg forgot to make harmless. Baldr the platform finds those dependencies before they find you.*
 
-Open-source Software Composition Analysis (SCA) platform. Baldr automatically scans your GitHub organization's repositories for vulnerable and malicious dependencies, maps each finding to the responsible team via CODEOWNERS, and uses LLM analysis to help triage what actually matters.
-
-Inspired by Snyk.io, built to be self-hosted.
-
 ---
+
+## The problem
+
+Point any SCA scanner at a real organization and you get **thousands of findings**. Almost all of them are noise:
+
+- the vulnerable function is **never called** from your code,
+- the package is a **transitive, build-time-only** dependency,
+- the CVE is **critical on paper** but has no known exploit and isn't internet-reachable.
+
+Security teams burn weeks manually triaging this backlog, alert fatigue sets in, and the *one* finding that's genuinely exploitable gets buried under 4,000 that aren't. Sorting by CVSS doesn't help — **severity is not risk.**
+
+## How Baldr cuts the noise
+
+Baldr scans your GitHub org for vulnerable and malicious dependencies like any SCA tool — and then does the part the others leave to you. For each finding, an **LLM agent explores the actual repository** to answer the question that matters: *does this vulnerability matter **here**?*
+
+```
+                        4,200 raw findings
+                               │
+            ┌──────────────────┼──────────────────┐
+            ▼                  ▼                  ▼
+   1. Reachability      2. LLM code agent    3. Risk scoring
+   Is the vulnerable    Reads the repo,      Blends technical +
+   symbol imported &    inspects import      threat (EPSS, CISA
+   called at all?       sites, judges real   KEV) + business
+                        criticality + gives  (exposure, asset
+                        a confidence score   criticality)
+            └──────────────────┼──────────────────┘
+                               ▼
+                  ~80 ranked, explainable findings
+                  auto-confirmed when confidence is high,
+                  each routed to the owning team
+```
+
+The result: a **ranked, explainable** queue instead of a 4,000-row CSV. High-confidence, reachable, truly-critical findings are auto-confirmed; the rest are ranked so humans review the riskiest first.
+
+## How Baldr compares
+
+Most tools tell you *what's vulnerable*. Baldr tells you *what to fix first* — and routes it to the right team, on infrastructure you control.
+
+| | Dependabot | Typical SCA (Snyk, etc.) | **Baldr** |
+|---|:---:|:---:|:---:|
+| Multi-ecosystem SCA (OSV) | ✅ | ✅ | ✅ |
+| Malicious package detection | ⚠️ limited | ✅ | ✅ |
+| **Reachability analysis** | ❌ | 💲 paid tiers | ✅ |
+| **LLM agent reads your code to triage** | ❌ | ❌ | ✅ |
+| **Explainable risk score (EPSS + CISA KEV + business context)** | ❌ | ⚠️ partial | ✅ |
+| Auto-confirm high-confidence findings | ❌ | ❌ | ✅ |
+| Auto-route to owning team (CODEOWNERS) | ❌ | ⚠️ partial | ✅ |
+| Org-wide scanning across many repos | ⚠️ per-repo | ✅ | ✅ |
+| Bring your own LLM / data stays in your infra | n/a | ❌ | ✅ |
+| Self-hosted & open source | ❌ | ❌ | ✅ (AGPL-3.0) |
+
+<sub>Comparison reflects commonly available capabilities at time of writing; vendor offerings change. Contributions to keep this honest are welcome.</sub>
 
 ## Features
 
-- **SCA with OSV Scanner** — detects vulnerabilities across 30+ ecosystems (Go, npm, PyPI, Maven, Cargo, and more) using the [OSV.dev](https://osv.dev) database
-- **Malicious package detection** — integrates the [OpenSSF malicious packages dataset](https://github.com/ossf/malicious-packages) and GuardDog (PyPI) for supply chain attack detection
-- **LLM-powered triage** — uses a local LiteLLM proxy to analyze findings in context and generate prioritized recommendations
-- **CODEOWNERS mapping** — automatically assigns each finding to the team responsible for that code path
-- **Multi-tenant** — full data isolation per tenant, multiple GitHub Organizations per tenant
-- **GitHub App integration** — per-tenant GitHub App with encrypted private key storage
-- **GitHub SSO + Google OAuth** — login via GitHub OAuth; Google remains optional
-- **Scheduled scans** — configurable cron per organization, async job queue via Redis (asynq)
-- **Manual scans** — trigger from the UI or `POST /api/v1/repos/:id/scan`
-- **Finding management** — suppress, mark as fixed, filter by severity / team / status
-- **Risk scoring** — custom algorithm combining CVSS, reachability, and context
-- **Internationalization** — English and Portuguese (pt-BR)
+- **🤖 LLM code agent for triage** — an agent reads each affected repo (import sites, call paths, context) and produces a criticality verdict + confidence, not just a CVSS number. Reachable + truly critical + high confidence findings are **auto-confirmed**; everything else is ranked for review.
+- **📊 Explainable risk scoring** — a transparent score blending three pillars: *technical* (severity, CVSS, reachability, fix availability), *threat* ([EPSS](https://www.first.org/epss/) + [CISA KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog)), and *business* (internet exposure, asset criticality, data sensitivity). Every score shows its factors.
+- **🔍 SCA with OSV Scanner** — detects vulnerabilities across 30+ ecosystems (Go, npm, PyPI, Maven, Cargo, and more) using the [OSV.dev](https://osv.dev) database.
+- **☠️ Malicious package detection** — integrates the [OpenSSF malicious packages dataset](https://github.com/ossf/malicious-packages) and GuardDog (PyPI) for supply chain attack detection.
+- **👥 CODEOWNERS mapping** — automatically routes each finding to the team responsible for that code path. No more "who owns this?".
+- **🏢 Multi-tenant** — full data isolation per tenant, multiple GitHub Organizations per tenant, per-tenant LLM config.
+- **🔐 GitHub App integration** — per-tenant GitHub App with AES-256-GCM encrypted private key storage.
+- **🔑 GitHub SSO + Google OAuth** — login via GitHub OAuth; Google remains optional.
+- **⏰ Scheduled & manual scans** — configurable cron per organization with an async job queue (Redis/asynq), or trigger on demand.
+- **🌐 Bring your own LLM** — talks to any OpenAI-compatible model via a local LiteLLM proxy. Your code and findings never leave your infrastructure.
+- **🌍 Internationalization** — English and Portuguese (pt-BR).
 
 ## Stack
 

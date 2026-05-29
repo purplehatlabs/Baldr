@@ -1,9 +1,6 @@
 ALTER TABLE tenant_llm_configs
-    ADD COLUMN default_model TEXT,
-    ADD COLUMN agentic_model TEXT,
-    ADD COLUMN translation_model TEXT,
-    ADD COLUMN batch_enabled BOOLEAN NOT NULL DEFAULT FALSE,
-    ADD COLUMN batch_mode TEXT NOT NULL DEFAULT 'realtime'
+    ADD COLUMN IF NOT EXISTS default_model TEXT,
+    ADD COLUMN IF NOT EXISTS batch_mode TEXT NOT NULL DEFAULT 'realtime'
         CHECK (batch_mode IN ('realtime', 'prefer_batch'));
 
 UPDATE tenant_llm_configs

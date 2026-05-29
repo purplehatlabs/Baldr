@@ -133,7 +133,7 @@ backend/Dockerfile:
   production → alpine + binaries only
 
 frontend/Dockerfile:
-  base       → node:20-alpine
+  base       → node:24-alpine
   dev        → base + npm install — used by docker-compose
   builder    → base + npm ci + vite build
   production → nginx:alpine + dist/ + nginx.conf

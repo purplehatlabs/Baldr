@@ -39,9 +39,9 @@ Security checks run on every push and pull request to `main` via
 |-----|------|-----------|
 | `lint-go` | golangci-lint (incl. gosec) | Yes |
 | `lint-frontend` | ESLint | Yes |
-| `govulncheck` | Go vulnerability DB | Yes |
+| `govulncheck` | Go vulnerability DB | Yes (fixable vulns only; see below) |
 | `osv-scanner` | OSV-Scanner on `go.mod` + `package-lock.json` | Yes (HIGH/CRITICAL with severity metadata) |
-| `gitleaks` | Secret scanning | Yes |
+| `gitleaks` | Gitleaks CLI (`gitleaks detect`) | Yes |
 | `license-check` | go-licenses + license-checker | Yes |
 | `semgrep` | Semgrep (`p/ci`, Go, TypeScript) | Yes |
 
@@ -58,7 +58,10 @@ Dependency updates are proposed weekly by
 
 ### Known exceptions
 
+- **Gitleaks license** — organization repositories require a `GITLEAKS_LICENSE` secret (free tier available at [gitleaks.io](https://gitleaks.io)). This repository uses the org-level secret configured in GitHub Actions.
 - **OSV-Scanner severity filter** — only advisories with `database_specific.severity` of `HIGH` or `CRITICAL` fail CI. Go stdlib advisories without that field are tracked via `govulncheck` instead.
+- **govulncheck unfixed transitive debt** — CI fails when `govulncheck` reports vulnerabilities with an available fix. Unfixed transitive advisories (currently Moby/docker via `osv-scanner` container scanning) are logged as warnings via [`.github/scripts/run-govulncheck.sh`](.github/scripts/run-govulncheck.sh).
+- **Gitleaks** — uses the open-source CLI from GitHub releases (no `gitleaks-action` license).
 - **go-licenses ignores** — `github.com/spdx/tools-golang` (GPL-2.0, indirect via OSV tooling) and `github.com/deitch/magic/*` (missing license metadata) are excluded until upstream metadata improves.
 - **Trivy `ignore-unfixed: true`** — release image scans fail only on fixable CRITICAL/HIGH issues in base images and runtime dependencies.
 - **CodeQL** — not enabled (requires GitHub Advanced Security license).

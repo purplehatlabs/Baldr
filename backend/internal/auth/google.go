@@ -55,7 +55,7 @@ func (g *GoogleProvider) Exchange(ctx context.Context, code string) (*GoogleUser
 	if err != nil {
 		return nil, fmt.Errorf("fetch user info: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("userinfo returned status %d", resp.StatusCode)

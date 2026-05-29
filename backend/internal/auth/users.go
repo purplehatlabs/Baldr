@@ -81,7 +81,7 @@ func (s *UserStore) UpsertGoogleUser(ctx context.Context, info *GoogleUserInfo) 
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	tenantID := uuid.New()
 	userID := uuid.New()
@@ -157,7 +157,7 @@ func (s *UserStore) UpsertGitHubUser(ctx context.Context, info *GitHubUserInfo) 
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	tenantID := uuid.New()
 	userID := uuid.New()

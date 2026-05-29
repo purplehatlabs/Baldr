@@ -67,7 +67,7 @@ func runDown() error {
 	if err != nil {
 		return fmt.Errorf("create migrator: %w", err)
 	}
-	defer m.Close()
+	defer func() { _, _ = m.Close() }()
 
 	if err := m.Steps(-1); err != nil && err != migrate.ErrNoChange {
 		return fmt.Errorf("run down: %w", err)
@@ -90,7 +90,7 @@ func runForce(args []string) error {
 	if err != nil {
 		return fmt.Errorf("create migrator: %w", err)
 	}
-	defer m.Close()
+	defer func() { _, _ = m.Close() }()
 
 	if err := m.Force(version); err != nil {
 		return fmt.Errorf("force version: %w", err)

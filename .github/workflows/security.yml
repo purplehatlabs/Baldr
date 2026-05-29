@@ -80,7 +80,8 @@ jobs:
           cache-dependency-path: backend/go.sum
 
       - name: Run govulncheck
-        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+        working-directory: backend
+        run: bash ../.github/scripts/run-govulncheck.sh
 
   osv-scanner:
     name: OSV-Scanner
@@ -89,7 +90,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Scan lockfiles
-        uses: google/osv-scanner-action/osv-scanner-action@v2
+        uses: google/osv-scanner-action/osv-scanner-action@v2.3.5
         with:
           scan-args: |-
             --lockfile=backend/go.mod
@@ -109,9 +110,10 @@ jobs:
           fetch-depth: 0
 
       - name: Secret scan
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
   license-check:
     name: License compliance

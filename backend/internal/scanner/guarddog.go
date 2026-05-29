@@ -86,10 +86,7 @@ func ParseManifestDependencies(manifest Manifest) ([]ParsedDependency, error) {
 	}
 	out := make([]ParsedDependency, 0, len(dependencies))
 	for _, dependency := range dependencies {
-		out = append(out, ParsedDependency{
-			Name:    dependency.Name,
-			Version: dependency.Version,
-		})
+		out = append(out, ParsedDependency(dependency))
 	}
 	return out, nil
 }

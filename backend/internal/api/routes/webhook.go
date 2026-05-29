@@ -4,15 +4,11 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"io"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/purplehatlabs/Baldr/internal/models"
-	repositoriesvc "github.com/purplehatlabs/Baldr/internal/repositories"
 	"github.com/purplehatlabs/Baldr/internal/scheduler"
 	"go.uber.org/zap"
 )
@@ -75,39 +71,4 @@ func (h *WebhookHandler) verifySignature(body []byte, sig string) bool {
 	mac.Write(body)
 	expected := "sha256=" + hex.EncodeToString(mac.Sum(nil))
 	return hmac.Equal([]byte(sig), []byte(expected))
-}
-
-// EnqueueWebhookScan triggers a scan for a repo identified by its GitHub full_name.
-func (h *WebhookHandler) enqueueByFullName(ctx *gin.Context, fullName string) {
-	rows, err := h.db.Query(ctx.Request.Context(), `
-		SELECT id FROM repositories WHERE full_name = $1 AND is_archived = FALSE`, fullName,
-	)
-	if err != nil {
-		h.log.Warn("webhook: repo not found", zap.String("full_name", fullName))
-		return
-	}
-	defer rows.Close()
-
-	found := false
-	for rows.Next() {
-		found = true
-		var repoID uuid.UUID
-		if err := rows.Scan(&repoID); err != nil {
-			continue
-		}
-		if err := h.scheduler.EnqueueRepo(repoID, models.TriggerWebhook); err != nil {
-			if errors.Is(err, repositoriesvc.ErrScanBlockedMissingInternetExposure) {
-				h.log.Info("webhook: scan blocked due to missing exposure", zap.String("repo_id", repoID.String()))
-				continue
-			}
-			if errors.Is(err, repositoriesvc.ErrScanAlreadyQueuedOrRunning) {
-				h.log.Debug("webhook: scan already queued or running", zap.String("repo_id", repoID.String()))
-				continue
-			}
-			h.log.Warn("webhook: enqueue failed", zap.String("repo_id", repoID.String()), zap.Error(err))
-		}
-	}
-	if !found {
-		h.log.Warn("webhook: repo not found", zap.String("full_name", fullName))
-	}
 }

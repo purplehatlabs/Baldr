@@ -17,7 +17,7 @@ import (
 
 func main() {
 	log, _ := zap.NewProduction()
-	defer log.Sync()
+	defer func() { _ = log.Sync() }()
 
 	cfg := config.Load()
 
@@ -37,7 +37,7 @@ func main() {
 
 	ghClient := githubclient.NewClient(pool, cfg.PEMEncryptionKey)
 	asynqClient := asynq.NewClient(redisOpt)
-	defer asynqClient.Close()
+	defer func() { _ = asynqClient.Close() }()
 	enqueuer := queue.NewEnqueuer(asynqClient)
 
 	srv := asynq.NewServer(redisOpt, asynq.Config{

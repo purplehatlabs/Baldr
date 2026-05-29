@@ -306,7 +306,7 @@ func (h *scanRepoHandler) runScan(
 	if err != nil {
 		return fmt.Errorf("clone: %w", err)
 	}
-	defer os.RemoveAll(cloneDir)
+	defer func() { _ = os.RemoveAll(cloneDir) }()
 
 	log.Info("cloned repo", zap.String("dir", cloneDir))
 

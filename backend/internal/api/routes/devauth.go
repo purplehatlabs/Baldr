@@ -79,7 +79,7 @@ func (h *DevAuthHandler) upsertDevUser(ctx context.Context, email, name string) 
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	tenantID := uuid.New()
 	_, err = tx.Exec(ctx,

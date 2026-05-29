@@ -176,7 +176,7 @@ func (c *AgentClient) Chat(ctx context.Context, messages []ChatMessage, tools []
 	if err != nil {
 		return ChatMessage{}, fmt.Errorf("call litellm: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {

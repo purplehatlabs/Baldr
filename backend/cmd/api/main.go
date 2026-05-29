@@ -25,7 +25,7 @@ import (
 
 func main() {
 	log, _ := zap.NewProduction()
-	defer log.Sync()
+	defer func() { _ = log.Sync() }()
 
 	cfg := config.Load()
 
@@ -104,7 +104,7 @@ func main() {
 
 	ghClient := githubclient.NewClient(pool, cfg.PEMEncryptionKey)
 	asynqClient := asynq.NewClient(redisOpt)
-	defer asynqClient.Close()
+	defer func() { _ = asynqClient.Close() }()
 	enqueuer := queue.NewEnqueuer(asynqClient)
 
 	routes.NewOrgsHandler(pool, ghClient, sched, enqueuer, cfg.GitHubMembershipSyncEnabled, log).Register(r, authMW)
@@ -123,8 +123,9 @@ func main() {
 	routes.NewWebhookHandler(pool, sched, cfg.GitHubWebhookSecret, log).Register(r)
 
 	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%s", cfg.APIPort),
-		Handler: r,
+		Addr:              fmt.Sprintf(":%s", cfg.APIPort),
+		Handler:           r,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	go func() {

@@ -685,7 +685,7 @@ func (h *FindingsHandler) createManual(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 		return
 	}
-	defer tx.Rollback(c.Request.Context())
+	defer func() { _ = tx.Rollback(c.Request.Context()) }()
 
 	err = tx.QueryRow(c.Request.Context(), `
 		INSERT INTO findings (
@@ -807,7 +807,7 @@ func (h *FindingsHandler) update(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 		return
 	}
-	defer tx.Rollback(c.Request.Context())
+	defer func() { _ = tx.Rollback(c.Request.Context()) }()
 
 	var previousStatus string
 	err = tx.QueryRow(c.Request.Context(), `
@@ -945,7 +945,7 @@ func (h *FindingsHandler) bulkActions(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 		return
 	}
-	defer tx.Rollback(c.Request.Context())
+	defer func() { _ = tx.Rollback(c.Request.Context()) }()
 
 	rows, err := tx.Query(c.Request.Context(), `
 		SELECT f.id, f.status

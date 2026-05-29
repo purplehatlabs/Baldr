@@ -25,7 +25,7 @@ func doChatCompletion(httpClient *http.Client, req *http.Request) ([]byte, int, 
 	if err != nil {
 		return nil, 0, fmt.Errorf("call litellm: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {

@@ -7,7 +7,7 @@ require (
 	github.com/gin-contrib/cors v1.7.2
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-co-op/gocron/v2 v2.10.0
-	github.com/golang-jwt/jwt/v5 v5.2.1
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang-migrate/migrate/v4 v4.17.1
 	github.com/google/go-github/v63 v63.0.0
 	github.com/google/osv-scanner/v2 v2.0.0-beta2

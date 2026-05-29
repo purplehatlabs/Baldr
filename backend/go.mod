@@ -18,7 +18,7 @@ require (
 	github.com/pandatix/go-cvss v0.6.2
 	github.com/spf13/viper v1.19.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/oauth2 v0.24.0
+	golang.org/x/oauth2 v0.36.0
 )
 
 require (

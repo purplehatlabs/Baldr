@@ -136,9 +136,10 @@ func (c *AgentClient) ToolDefinitions() []map[string]any {
 }
 
 func (c *AgentClient) Chat(ctx context.Context, messages []ChatMessage, tools []map[string]any) (ChatMessage, CompletionUsage, error) {
+	allowPromptCache := len(tools) == 0 && !hasSystemMessage(messages)
 	payloadMessages := make([]map[string]any, 0, len(messages))
 	for _, m := range messages {
-		payloadMessages = append(payloadMessages, encodeChatMessage(m))
+		payloadMessages = append(payloadMessages, encodeChatMessage(m, allowPromptCache))
 	}
 
 	bodyMap := map[string]any{
@@ -162,9 +163,10 @@ func (c *AgentClient) Chat(ctx context.Context, messages []ChatMessage, tools []
 }
 
 func (c *AgentClient) FinalizeStructuredResult(ctx context.Context, messages []ChatMessage) (*AgentAnalysisResult, CompletionUsage, error) {
+	allowPromptCache := !hasSystemMessage(messages)
 	payloadMessages := make([]map[string]any, 0, len(messages)+1)
 	for _, m := range messages {
-		payloadMessages = append(payloadMessages, encodeChatMessage(m))
+		payloadMessages = append(payloadMessages, encodeChatMessage(m, allowPromptCache))
 	}
 	payloadMessages = append(payloadMessages, map[string]any{
 		"role":    "user",
@@ -217,7 +219,7 @@ func (c *AgentClient) doChat(ctx context.Context, body []byte) (ChatMessage, Com
 	return msg, usage, nil
 }
 
-func encodeChatMessage(m ChatMessage) map[string]any {
+func encodeChatMessage(m ChatMessage, allowPromptCache bool) map[string]any {
 	if m.ToolCallID != "" {
 		return map[string]any{
 			"role":         m.Role,
@@ -243,7 +245,7 @@ func encodeChatMessage(m ChatMessage) map[string]any {
 		}
 		return msg
 	}
-	if m.Cacheable && m.Content != "" {
+	if allowPromptCache && m.Cacheable && m.Content != "" {
 		return map[string]any{
 			"role": m.Role,
 			"content": []map[string]any{
@@ -262,6 +264,15 @@ func encodeChatMessage(m ChatMessage) map[string]any {
 		msg["content"] = m.Content
 	}
 	return msg
+}
+
+func hasSystemMessage(messages []ChatMessage) bool {
+	for _, m := range messages {
+		if strings.EqualFold(m.Role, "system") {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *AgentClient) logCacheUsage(usage CompletionUsage) {

@@ -1,5 +1,5 @@
 import { Outlet, useLocation } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
+import { useTranslation, Trans } from 'react-i18next'
 import Sidebar from './Sidebar'
 import Header from './Header'
 
@@ -34,6 +34,20 @@ export default function AppLayout() {
         <main className="flex-1 p-6 overflow-auto">
           <Outlet />
         </main>
+        <footer className="px-6 py-3 text-xs text-gray-400 border-t border-gray-200">
+          <Trans
+            i18nKey="layout.footer"
+            values={{ year: new Date().getFullYear() }}
+            components={[
+              <a
+                href="https://purplehat.com.br"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-gray-600"
+              />,
+            ]}
+          />
+        </footer>
       </div>
     </div>
   )

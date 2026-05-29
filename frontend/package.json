@@ -1,6 +1,7 @@
 {
   "name": "devsecops-frontend",
   "version": "0.1.0",
+  "author": "PurpleHat Labs (https://purplehat.com.br)",
   "private": true,
   "type": "module",
   "scripts": {

@@ -17,7 +17,8 @@
   },
   "layout": {
     "projectDetails": "Detalhes do projeto",
-    "defaultTitle": "DevSecOps"
+    "defaultTitle": "AppSec",
+    "footer": "Baldr — por <0>PurpleHat Labs</0> · © {{year}}"
   },
   "header": {
     "logout": "Sair",
@@ -26,7 +27,7 @@
     }
   },
   "login": {
-    "tagline": "Análise de vulnerabilidades de dependências para toda a organização",
+    "tagline": "Plataforma de AppSec self-hosted para toda a organização",
     "title": "Entrar na plataforma",
     "githubHint": "Use sua conta GitHub corporativa",
     "googleHint": "Use sua conta Google corporativa",

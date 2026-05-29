@@ -4,7 +4,7 @@
 
 ### Stop drowning in vulnerabilities. Fix the 2% that can actually hurt you.
 
-**Open-source AppSec platform that uses an LLM agent to read your code and tell you which of your thousands of dependency vulnerabilities are *actually reachable and exploitable* — so your team triages what matters instead of chasing CVSS scores.**
+**Open-source AppSec platform that uses an LLM agent to read your code and tell you which of your thousands of security findings are *actually reachable and exploitable* — so your team triages what matters instead of chasing CVSS scores.**
 
 [![CI](https://github.com/purplehatlabs/Baldr/actions/workflows/ci.yml/badge.svg)](https://github.com/purplehatlabs/Baldr/actions/workflows/ci.yml)
 [![Security](https://github.com/purplehatlabs/Baldr/actions/workflows/security.yml/badge.svg)](https://github.com/purplehatlabs/Baldr/actions/workflows/security.yml)
@@ -12,6 +12,8 @@
 [![Self-hosted](https://img.shields.io/badge/deploy-self--hosted-success.svg)](#quick-start)
 
 [Quick start](#quick-start) · [How it works](#how-baldr-cuts-the-noise) · [Features](#features) · [Docs](#additional-documentation)
+
+Built and maintained by **[PurpleHat Labs](https://purplehat.com.br)**.
 
 </div>
 
@@ -361,6 +363,10 @@ Scheduler (cron) or manual API trigger
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Maintained by
+
+Baldr is built and maintained by **[PurpleHat Labs](https://purplehat.com.br)**.
 
 ## License
 

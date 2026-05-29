@@ -1,6 +1,6 @@
 # Contributing to Baldr
 
-Thank you for your interest in contributing! Baldr is an open-source SCA platform — every contribution helps the community.
+Thank you for your interest in contributing! Baldr is an open-source, self-hosted AppSec platform — every contribution helps the community.
 
 ## Getting started
 

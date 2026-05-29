@@ -133,7 +133,7 @@ jobs:
           exit-code: 1
           ignore-unfixed: true
 
-      - uses: sigstore/cosign-installer@v3.8.0
+      - uses: sigstore/cosign-installer@v4.1.2
 
       - name: Sign backend image
         run: cosign sign --yes "${{ env.BACKEND_IMAGE }}:${{ github.ref_name }}"

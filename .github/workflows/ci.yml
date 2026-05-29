@@ -116,7 +116,7 @@ jobs:
           provenance: true
 
       - name: Scan backend image (Trivy)
-        uses: aquasecurity/trivy-action@0.29.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.BACKEND_IMAGE }}:${{ github.ref_name }}
           format: table
@@ -125,7 +125,7 @@ jobs:
           ignore-unfixed: true
 
       - name: Scan frontend image (Trivy)
-        uses: aquasecurity/trivy-action@0.29.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.FRONTEND_IMAGE }}:${{ github.ref_name }}
           format: table

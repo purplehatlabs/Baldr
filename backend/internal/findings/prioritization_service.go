@@ -77,7 +77,7 @@ func (s *PrioritizationService) RecalculateRiskScore(ctx context.Context, findin
 		       f.epss_score, f.epss_percentile, f.kev_listed,
 		       COALESCE(r.asset_criticality, 'medium'),
 		       COALESCE(r.data_sensitivity, 'internal'),
-		       COALESCE(r.environment, 'production'),
+		       COALESCE(r.environment, 'prod'),
 		       r.is_internet_exposed
 		FROM findings f
 		LEFT JOIN manifests m ON m.id = f.manifest_id

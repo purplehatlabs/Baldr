@@ -234,7 +234,7 @@ func calculateBusinessScore(in RiskScoreInput) (float64, []RiskFactor) {
 		"staging": 10,
 		"prod":    20,
 	}
-	environment := normalizedOrDefault(in.Environment, "prod")
+	environment := normalizeEnvironment(in.Environment)
 	score += environmentPoints[environment]
 	factors = append(factors, RiskFactor{Name: "business.environment", Points: environmentPoints[environment], Detail: environment})
 
@@ -273,6 +273,20 @@ func applyTierOverrides(in RiskScoreInput, tier models.RiskTier, threatScore flo
 			Name:   "override.internet_exposed_exploitable_minimum",
 			Points: 0,
 			Detail: "minimum_high",
+		})
+	}
+
+	if in.Severity == models.SeverityCritical &&
+		in.ReachabilityStatus == models.ReachabilityReachable &&
+		in.IsInternetExposed != nil && *in.IsInternetExposed &&
+		in.Exploitability != nil &&
+		exploitabilityAtLeast(*in.Exploitability, models.ExploitHigh) &&
+		riskTierLessThan(updatedTier, models.RiskTierCritical) {
+		updatedTier = models.RiskTierCritical
+		factors = append(factors, RiskFactor{
+			Name:   "override.critical_reachable_exposed_exploitable",
+			Points: 0,
+			Detail: "forced_critical",
 		})
 	}
 
@@ -406,6 +420,14 @@ func normalizedOrDefault(raw, fallback string) string {
 		return fallback
 	}
 	return v
+}
+
+func normalizeEnvironment(raw string) string {
+	environment := normalizedOrDefault(raw, "prod")
+	if environment == "production" {
+		return "prod"
+	}
+	return environment
 }
 
 func downgradeTier(tier models.RiskTier) models.RiskTier {

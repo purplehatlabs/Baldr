@@ -28,7 +28,25 @@ func (c *Client) TranslateAnalysisToPtBR(ctx context.Context, input AnalysisTran
 		return &AnalysisTranslationResult{}, nil
 	}
 
-	systemPrompt := `You translate security analysis text from English to Brazilian Portuguese (pt-BR).
+	userPayload, err := json.Marshal(map[string]string{
+		"reasoning":         input.Reasoning,
+		"exploitation_path": input.ExploitationPath,
+		"remediation_path":  input.RemediationPath,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("marshal translation input: %w", err)
+	}
+
+	content, err := c.chatCompletionJSON(ctx, BuildTranslationSystemPrompt(), string(userPayload))
+	if err != nil {
+		return nil, err
+	}
+
+	return parseAnalysisTranslationResult(content)
+}
+
+func BuildTranslationSystemPrompt() string {
+	return `You translate security analysis text from English to Brazilian Portuguese (pt-BR).
 Respond ONLY with valid JSON matching this schema:
 {
   "reasoning": "translated reasoning or empty string",
@@ -40,22 +58,18 @@ Rules:
 - Keep code snippets, paths, and line references unchanged.
 - Use clear Brazilian Portuguese for explanatory prose.
 - If a field is empty in the input, return an empty string for that field.`
+}
 
+func BuildTranslationUserPrompt(input AnalysisTranslationInput) (string, error) {
 	userPayload, err := json.Marshal(map[string]string{
 		"reasoning":         input.Reasoning,
 		"exploitation_path": input.ExploitationPath,
 		"remediation_path":  input.RemediationPath,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("marshal translation input: %w", err)
+		return "", fmt.Errorf("marshal translation input: %w", err)
 	}
-
-	content, err := c.chatCompletionJSON(ctx, systemPrompt, string(userPayload))
-	if err != nil {
-		return nil, err
-	}
-
-	return parseAnalysisTranslationResult(content)
+	return string(userPayload), nil
 }
 
 func parseAnalysisTranslationResult(content string) (*AnalysisTranslationResult, error) {
@@ -91,7 +105,7 @@ func (c *Client) chatCompletionJSON(ctx context.Context, systemPrompt, userPromp
 		return "", err
 	}
 
-	respBody, statusCode, err := doChatCompletion(c.httpClient, req)
+	respBody, statusCode, err := doChatCompletionWithRetry(ctx, c.httpClient, req)
 	if err != nil {
 		return "", err
 	}

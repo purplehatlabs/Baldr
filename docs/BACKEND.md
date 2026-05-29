@@ -10,11 +10,14 @@ backend/
 └── internal/
     ├── api/
     │   ├── middleware/
-    │   │   └── auth.go    # Extracts JWT from cookie/header, injects claims into context
+    │   │   ├── auth.go    # Extracts JWT from cookie/header, injects claims into context
+    │   │   └── rbac.go    # RequireRole / RequireAdmin authorization guards
     │   └── routes/        # One file per resource
     ├── auth/
     │   ├── google.go      # OAuth 2.0 exchange + userinfo
-    │   └── jwt.go         # Issue + Validate JWT
+    │   ├── jwt.go         # Issue + Validate JWT
+    │   ├── memberships.go # tenant_memberships store
+    │   └── session.go     # JWT issuance from active membership role
     ├── codeowners/
     │   └── parser.go      # Parse CODEOWNERS → OwnersForPath()
     ├── config/
@@ -95,6 +98,23 @@ h.db.Query(ctx, `SELECT ... FROM widgets WHERE tenant_id = $1`, claims.TenantID)
 // WRONG ❌ — never trust tenant_id from body/query string
 tenantID := c.Query("tenant_id") // NEVER
 ```
+
+## Multi-tenant auth and RBAC
+
+- `GET /auth/tenants` — lists active memberships for the signed-in user.
+- `POST /auth/switch-tenant` — body `{ "tenant_id": "<uuid>" }`; validates membership and reissues JWT cookie with role + `token_version`.
+- `GET /api/v1/members` — list tenant members (admin/owner only).
+- `PATCH /api/v1/members/:id` — update role or status (admin/owner only); bumps `tenant_memberships.token_version` to invalidate existing JWTs for that user in the tenant.
+- `POST /api/v1/invites` — create email invite (admin/owner only).
+- `GET /api/v1/invites` — list pending invites (admin/owner only).
+- `DELETE /api/v1/invites/:id` — revoke pending invite (admin/owner only).
+- `POST /api/v1/invites/:token/accept` — accept invite for the signed-in user (email must match).
+- JWT claims include `token_version`; `middleware.Auth(tokens, memberships)` rejects stale sessions with `401 session expired`.
+- `users.tenant_id` and `users.role` are **deprecated** — handlers read role/tenant from JWT + `tenant_memberships`; legacy columns remain for bootstrap/backfill only.
+- First user bootstrap on new tenant creation assigns `admin` in `tenant_memberships`.
+- Use `middleware.RequireAdmin()` or `middleware.RequireRole(...)` on routes that need elevated access.
+
+Integration tests (`//go:build integration`) live in `internal/api/routes/auth_tenant_security_integration_test.go` and require `TEST_DATABASE_URL`. CI runs them against a PostgreSQL service container.
 
 ## SQL queries
 

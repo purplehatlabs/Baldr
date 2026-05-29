@@ -36,6 +36,57 @@ type User struct {
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 }
 
+type MembershipStatus string
+
+const (
+	MembershipActive   MembershipStatus = "active"
+	MembershipInactive MembershipStatus = "inactive"
+)
+
+type TenantMembership struct {
+	ID           uuid.UUID        `json:"id" db:"id"`
+	TenantID     uuid.UUID        `json:"tenant_id" db:"tenant_id"`
+	UserID       uuid.UUID        `json:"user_id" db:"user_id"`
+	Role         UserRole         `json:"role" db:"role"`
+	Status       MembershipStatus `json:"status" db:"status"`
+	TokenVersion int              `json:"token_version" db:"token_version"`
+	CreatedAt    time.Time        `json:"created_at" db:"created_at"`
+	UpdatedAt    time.Time        `json:"updated_at" db:"updated_at"`
+}
+
+type InviteStatus string
+
+const (
+	InvitePending  InviteStatus = "pending"
+	InviteAccepted InviteStatus = "accepted"
+	InviteRevoked  InviteStatus = "revoked"
+	InviteExpired  InviteStatus = "expired"
+)
+
+type TenantInvite struct {
+	ID         uuid.UUID    `json:"id" db:"id"`
+	TenantID   uuid.UUID    `json:"tenant_id" db:"tenant_id"`
+	Email      string       `json:"email" db:"email"`
+	Role       UserRole     `json:"role" db:"role"`
+	Token      string       `json:"token" db:"token"`
+	InvitedBy  uuid.UUID    `json:"invited_by" db:"invited_by"`
+	Status     InviteStatus `json:"status" db:"status"`
+	ExpiresAt  time.Time    `json:"expires_at" db:"expires_at"`
+	CreatedAt  time.Time    `json:"created_at" db:"created_at"`
+	AcceptedAt *time.Time   `json:"accepted_at,omitempty" db:"accepted_at"`
+	AcceptedBy *uuid.UUID   `json:"accepted_by,omitempty" db:"accepted_by"`
+}
+
+// TenantSummary is returned by auth tenant listing endpoints.
+type TenantSummary struct {
+	TenantID   uuid.UUID `json:"tenant_id"`
+	TenantName string    `json:"tenant_name"`
+	TenantSlug string    `json:"tenant_slug"`
+	Role       UserRole  `json:"role"`
+	Status     MembershipStatus `json:"status"`
+	IsActive   bool      `json:"is_active"`
+}
+
 // TenantGitHubAppConfig stores the per-tenant GitHub App credentials.
 // The private key is AES-GCM encrypted; never expose it through the API.
 type TenantGitHubAppConfig struct {
@@ -50,15 +101,29 @@ type TenantGitHubAppConfig struct {
 // TenantLLMConfig holds the per-tenant LiteLLM/OpenAI-compatible endpoint.
 // The API key is AES-GCM encrypted; never expose it through the API.
 type TenantLLMConfig struct {
-	TenantID        uuid.UUID  `json:"tenant_id" db:"tenant_id"`
-	BaseURL         string     `json:"base_url" db:"base_url"`
-	Model           string     `json:"model" db:"model"`
-	APIKeyEncrypted []byte     `json:"-" db:"api_key_encrypted"`
-	TimeoutSeconds  int        `json:"timeout_seconds" db:"timeout_seconds"`
-	UpdatedByUserID *uuid.UUID `json:"updated_by_user_id,omitempty" db:"updated_by_user_id"`
-	UpdatedAt       time.Time  `json:"updated_at" db:"updated_at"`
-	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
+	TenantID         uuid.UUID  `json:"tenant_id" db:"tenant_id"`
+	BaseURL          string     `json:"base_url" db:"base_url"`
+	Model            string     `json:"model" db:"model"`
+	DefaultModel     string     `json:"default_model" db:"default_model"`
+	AgenticModel     *string    `json:"agentic_model,omitempty" db:"agentic_model"`
+	TranslationModel *string    `json:"translation_model,omitempty" db:"translation_model"`
+	BatchEnabled     bool       `json:"batch_enabled" db:"batch_enabled"`
+	BatchMode        string     `json:"batch_mode" db:"batch_mode"`
+	APIKeyEncrypted  []byte     `json:"-" db:"api_key_encrypted"`
+	TimeoutSeconds   int        `json:"timeout_seconds" db:"timeout_seconds"`
+	UpdatedByUserID  *uuid.UUID `json:"updated_by_user_id,omitempty" db:"updated_by_user_id"`
+	UpdatedAt        time.Time  `json:"updated_at" db:"updated_at"`
+	CreatedAt        time.Time  `json:"created_at" db:"created_at"`
 }
+
+type LLMDispatchMode string
+
+const (
+	LLMDispatchRealtime      LLMDispatchMode = "realtime"
+	LLMDispatchBatchPending  LLMDispatchMode = "batch_pending"
+	LLMDispatchBatchDone     LLMDispatchMode = "batch_done"
+	LLMDispatchBatchFallback LLMDispatchMode = "batch_fallback"
+)
 
 type Organization struct {
 	ID                      uuid.UUID `json:"id" db:"id"`
@@ -333,6 +398,9 @@ type FindingAnalysis struct {
 	ScanJobID             *uuid.UUID             `json:"scan_job_id,omitempty" db:"scan_job_id"`
 	AnalysisStatus        AnalysisStatus         `json:"analysis_status" db:"analysis_status"`
 	TriggerSource         AnalysisTrigger        `json:"trigger_source" db:"trigger_source"`
+	LLMDispatchMode       LLMDispatchMode        `json:"llm_dispatch_mode" db:"llm_dispatch_mode"`
+	LLMBatchID            *string                `json:"llm_batch_id,omitempty" db:"llm_batch_id"`
+	LLMDispatchMeta       []byte                 `json:"llm_dispatch_meta,omitempty" db:"llm_dispatch_meta"`
 	CriticalityVerdict    *CriticalityVerdict    `json:"criticality_verdict,omitempty" db:"criticality_verdict"`
 	ExploitabilityVerdict *ExploitabilityVerdict `json:"exploitability_verdict,omitempty" db:"exploitability_verdict"`
 	Confidence            *float64               `json:"confidence,omitempty" db:"confidence"`

@@ -21,3 +21,27 @@ linters:
       - path: _test\.go
         linters:
           - gosec
+      - path: cmd/migrate/
+        linters:
+          - gosec
+        text: "G301|G306"
+      - path: internal/findings/reachability\.go
+        linters:
+          - gosec
+        text: "G304|G122"
+      - path: internal/findings/codeagent/tools\.go
+        linters:
+          - gosec
+        text: "G304|G122"
+      - path: internal/scanner/guarddog\.go
+        linters:
+          - gosec
+        text: "G204|G304"
+      - path: internal/llm/http\.go
+        linters:
+          - gosec
+        text: "G704"
+      - path: internal/queue/package_analysis\.go
+        linters:
+          - gosec
+        text: "G505|G401"

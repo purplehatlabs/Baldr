@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/purplehatlabs/Baldr/internal/api/middleware"
 	"github.com/purplehatlabs/Baldr/internal/auth"
@@ -22,6 +23,8 @@ type AuthHandler struct {
 	github          *auth.GitHubProvider
 	users           *auth.UserStore
 	tokens          *auth.TokenService
+	session         *auth.SessionTokens
+	memberships     *auth.MembershipStore
 	db              *pgxpool.Pool
 	log             *zap.Logger
 	frontendBaseURL string
@@ -41,11 +44,14 @@ type AuthHandlerConfig struct {
 }
 
 func NewAuthHandler(cfg AuthHandlerConfig) *AuthHandler {
+	memberships := auth.NewMembershipStore(cfg.DB)
 	return &AuthHandler{
 		google:          cfg.Google,
 		github:          cfg.GitHub,
 		users:           auth.NewUserStore(cfg.DB),
 		tokens:          cfg.Tokens,
+		session:         auth.NewSessionTokens(cfg.Tokens, memberships),
+		memberships:     memberships,
 		db:              cfg.DB,
 		log:             cfg.Log,
 		frontendBaseURL: strings.TrimRight(cfg.FrontendBaseURL, "/"),
@@ -69,6 +75,8 @@ func (h *AuthHandler) Register(r gin.IRouter) {
 func (h *AuthHandler) RegisterProtected(r gin.IRouter, authMW gin.HandlerFunc) {
 	r.GET("/auth/me", authMW, h.me)
 	r.PATCH("/auth/me/preferences", authMW, h.updatePreferences)
+	r.GET("/auth/tenants", authMW, h.listTenants)
+	r.POST("/auth/switch-tenant", authMW, h.switchTenant)
 }
 
 func (h *AuthHandler) redirectToGitHub(c *gin.Context) {
@@ -159,7 +167,7 @@ func (h *AuthHandler) validateOAuthState(c *gin.Context) bool {
 }
 
 func (h *AuthHandler) finishLogin(c *gin.Context, user *models.User) {
-	tokenStr, err := h.tokens.Issue(user.ID, user.TenantID, user.Email, string(user.Role))
+	tokenStr, err := h.session.IssueForUser(c.Request.Context(), user)
 	if err != nil {
 		h.log.Error("issue token failed", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not issue token"})
@@ -190,17 +198,110 @@ func (h *AuthHandler) me(c *gin.Context) {
 
 	var user models.User
 	err := h.db.QueryRow(c.Request.Context(),
-		`SELECT id, tenant_id, email, name, avatar_url, role, COALESCE(NULLIF(language, ''), 'en'), created_at
-		 FROM users WHERE id = $1 AND tenant_id = $2`,
-		claims.UserID, claims.TenantID,
-	).Scan(&user.ID, &user.TenantID, &user.Email, &user.Name, &user.AvatarURL, &user.Role, &user.Language, &user.CreatedAt)
+		`SELECT id, email, name, avatar_url, COALESCE(NULLIF(language, ''), 'en'), created_at
+		 FROM users WHERE id = $1`,
+		claims.UserID,
+	).Scan(&user.ID, &user.Email, &user.Name, &user.AvatarURL, &user.Language, &user.CreatedAt)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
 		return
 	}
 	user.Language = i18n.ParseLocale(user.Language)
+	user.TenantID = claims.TenantID
+	user.Role = models.UserRole(claims.Role)
 
 	c.JSON(http.StatusOK, user)
+}
+
+func (h *AuthHandler) listTenants(c *gin.Context) {
+	claims := middleware.ClaimsFrom(c)
+	if claims == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	tenants, err := h.memberships.ListAccessibleTenants(c.Request.Context(), claims.UserID)
+	if err != nil {
+		h.log.Error("list tenants", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not list tenants"})
+		return
+	}
+	if tenants == nil {
+		tenants = []models.TenantSummary{}
+	}
+
+	activeTenantID := claims.TenantID
+	for i := range tenants {
+		tenants[i].IsActive = tenants[i].TenantID == activeTenantID
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"tenants":          tenants,
+		"active_tenant_id": activeTenantID,
+	})
+}
+
+type switchTenantRequest struct {
+	TenantID string `json:"tenant_id" binding:"required"`
+}
+
+func (h *AuthHandler) switchTenant(c *gin.Context) {
+	claims := middleware.ClaimsFrom(c)
+	if claims == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	var req switchTenantRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_id is required"})
+		return
+	}
+
+	tenantID, err := uuid.Parse(req.TenantID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid tenant_id"})
+		return
+	}
+
+	membership, err := h.memberships.GetActive(c.Request.Context(), tenantID, claims.UserID)
+	if err != nil {
+		if errors.Is(err, auth.ErrMembershipNotFound) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "no access to tenant"})
+			return
+		}
+		h.log.Error("switch tenant lookup", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not switch tenant"})
+		return
+	}
+
+	var email string
+	if err := h.db.QueryRow(c.Request.Context(),
+		`SELECT email FROM users WHERE id = $1`, claims.UserID,
+	).Scan(&email); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
+		return
+	}
+
+	tokenStr, err := h.tokens.Issue(claims.UserID, tenantID, email, string(membership.Role), membership.TokenVersion)
+	if err != nil {
+		h.log.Error("issue token on switch", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not issue token"})
+		return
+	}
+
+	c.SetCookie("access_token", tokenStr, int(24*time.Hour.Seconds()), "/", "", false, true)
+	h.log.Info("tenant switched",
+		zap.String("user_id", claims.UserID.String()),
+		zap.String("tenant_id", tenantID.String()),
+		zap.String("role", string(membership.Role)),
+	)
+
+	c.JSON(http.StatusOK, gin.H{
+		"ok":               true,
+		"active_tenant_id": tenantID,
+		"role":             membership.Role,
+	})
 }
 
 type updatePreferencesRequest struct {
@@ -226,8 +327,8 @@ func (h *AuthHandler) updatePreferences(c *gin.Context) {
 
 	locale := i18n.ParseLocale(*req.Language)
 	tag, err := h.db.Exec(c.Request.Context(),
-		`UPDATE users SET language = $1 WHERE id = $2 AND tenant_id = $3`,
-		locale, claims.UserID, claims.TenantID,
+		`UPDATE users SET language = $1 WHERE id = $2`,
+		locale, claims.UserID,
 	)
 	if err != nil {
 		h.log.Error("update user preferences", zap.Error(err))

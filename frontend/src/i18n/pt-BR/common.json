@@ -20,7 +20,10 @@
     "defaultTitle": "DevSecOps"
   },
   "header": {
-    "logout": "Sair"
+    "logout": "Sair",
+    "tenantSwitcher": {
+      "label": "Trocar workspace"
+    }
   },
   "login": {
     "tagline": "Análise de vulnerabilidades de dependências para toda a organização",
@@ -43,6 +46,11 @@
       "database": "Base de dados"
     }
   },
+  "invite": {
+    "invalidLink": "Link de convite inválido.",
+    "acceptSuccess": "Convite aceito. Redirecionando…",
+    "acceptFailed": "Não foi possível aceitar o convite."
+  },
   "settings": {
     "language": {
       "title": "Idioma",
@@ -52,6 +60,29 @@
       "ptBR": "Português (Brasil)",
       "saved": "Idioma atualizado.",
       "saveError": "Não foi possível atualizar o idioma."
+    },
+    "members": {
+      "title": "Membros do workspace",
+      "description": "Gerencie papéis e convites deste workspace. Alterações entram em vigor imediatamente e encerram a sessão dos usuários afetados.",
+      "listTitle": "Membros",
+      "empty": "Nenhum membro encontrado.",
+      "roleLabel": "Papel",
+      "statusLabel": "Status",
+      "roleMember": "Membro",
+      "roleAdmin": "Admin",
+      "roleOwner": "Owner",
+      "statusActive": "Ativo",
+      "statusInactive": "Inativo",
+      "inviteTitle": "Convidar por e-mail",
+      "inviteDescription": "Envie um link de convite para adicionar alguém a este workspace. A pessoa deve entrar com o e-mail convidado para aceitar.",
+      "inviteEmailPlaceholder": "colega@empresa.com",
+      "sendInvite": "Enviar convite",
+      "inviting": "Enviando…",
+      "inviteFailed": "Não foi possível criar o convite.",
+      "inviteExpires": "Expira em {{value}}",
+      "copyInviteLink": "Copiar link do convite",
+      "copied": "Copiado",
+      "revokeInvite": "Revogar convite"
     },
     "orgs": {
       "title": "Organizações GitHub",
@@ -116,6 +147,14 @@
       "autoAnalysisHigh": "High e Critical",
       "autoAnalysisMedium": "Medium, High e Critical",
       "autoAnalysisHint": "Findings abaixo deste limiar permanecem em triagem manual sem rodar o agente LLM automaticamente após o scan.",
+      "defaultModel": "Modelo padrão *",
+      "defaultModelHint": "Usado quando modelos agentic ou de tradução não estão definidos.",
+      "agenticModel": "Modelo agentic",
+      "agenticModelHint": "Modelo para investigação multi-turn no código. Usa o padrão se vazio.",
+      "translationModel": "Modelo de tradução",
+      "translationModelHint": "Modelo para tradução pt-BR. Usa o padrão se vazio.",
+      "batchEnabled": "Usar Batch API quando possível",
+      "batchEnabledHint": "Tradução após scan pode usar OpenAI Batch API com fallback automático para tempo real. Análise agentic sempre roda em tempo real.",
       "apiKey": "API Key",
       "apiKeyKeep": "(deixe em branco para manter a atual)",
       "apiKeyNoChange": "••••••••  (não alterar)",
@@ -158,12 +197,15 @@
       "suppress": "Suprimir",
       "reopen": "Reabrir",
       "markFixed": "Marcar como corrigido",
+      "reanalyze": "Re-analisar (IA)",
       "assign": "Assign",
       "apply": "Aplicar ação em lote",
       "applying": "Aplicando...",
       "clearSelection": "Limpar seleção",
       "assignPlaceholder": "user_id para atribuição",
-      "assignTitle": "Digite user_id para auditoria de atribuição"
+      "assignTitle": "Digite user_id para auditoria de atribuição",
+      "resultDefault": "Ação em lote aplicada em {{count}} achados.",
+      "resultReanalyze": "Reanálise enfileirada: {{enqueued}}. Já em fila/executando: {{alreadyQueued}}. Manuais ignorados: {{skippedManual}}. Falhas: {{failed}}."
     },
     "ai": {
       "title": "Análise IA",
@@ -521,6 +563,23 @@
     "scanning": "Enfileirando…",
     "scanRunning": "Em andamento…",
     "scanQueued": "Na fila…",
+    "context": {
+      "setExposureFirst": "Defina a exposição antes de editar o contexto",
+      "assetCriticality": "Criticidade do ativo",
+      "dataSensitivity": "Sensibilidade dos dados",
+      "environment": "Ambiente",
+      "criticalityLow": "Ativo: baixo",
+      "criticalityMedium": "Ativo: médio",
+      "criticalityHigh": "Ativo: alto",
+      "criticalityCritical": "Ativo: crítico",
+      "sensitivityPublic": "Dados: público",
+      "sensitivityInternal": "Dados: interno",
+      "sensitivityConfidential": "Dados: confidencial",
+      "sensitivityRestricted": "Dados: restrito",
+      "environmentDev": "Amb: dev",
+      "environmentStaging": "Amb: staging",
+      "environmentProd": "Amb: prod"
+    },
     "browse": {
       "title": "Repositórios em {{org}}",
       "subtitle": "Listados diretamente do GitHub",

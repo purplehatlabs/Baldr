@@ -52,6 +52,14 @@ const BROWSE_STALE_MS = 5 * 60 * 1000
 const SCAN_BATCH_MAX = 200
 const SCAN_POLL_MS = 5000
 
+type RepoExposureUpdateInput = {
+  repoId: string
+  isInternetExposed: boolean
+  assetCriticality: Repo['asset_criticality']
+  dataSensitivity: Repo['data_sensitivity']
+  environment: Repo['environment']
+}
+
 export default function RepositoriesPage() {
   const { t } = useTranslation()
   const [selectedOrg, setSelectedOrg] = useState<string>('')
@@ -125,10 +133,13 @@ export default function RepositoriesPage() {
   })
 
   const exposureMutation = useMutation({
-    mutationFn: (input: { isInternetExposed: boolean; repoId: string }) =>
+    mutationFn: (input: RepoExposureUpdateInput) =>
       updateRepoExposure(input.repoId, {
         exposure_source: 'manual',
         is_internet_exposed: input.isInternetExposed,
+        asset_criticality: input.assetCriticality,
+        data_sensitivity: input.dataSensitivity,
+        environment: input.environment,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['repos'] })
@@ -314,8 +325,8 @@ export default function RepositoriesPage() {
                   repo={repo}
                   onScan={() => scanMutation.mutate(repo.id)}
                   scanning={scanMutation.isPending && scanMutation.variables === repo.id}
-                  onSetExposure={(isInternetExposed) =>
-                    exposureMutation.mutate({ isInternetExposed, repoId: repo.id })
+                  onSetExposure={(input) =>
+                    exposureMutation.mutate({ ...input, repoId: repo.id })
                   }
                   settingExposure={
                     exposureMutation.isPending &&
@@ -856,7 +867,7 @@ function RepoRow({
   settingExposure,
 }: {
   onScan: () => void
-  onSetExposure: (isInternetExposed: boolean) => void
+  onSetExposure: (input: Omit<RepoExposureUpdateInput, 'repoId'>) => void
   repo: Repo
   scanning: boolean
   settingExposure: boolean
@@ -902,6 +913,9 @@ function RepoRow({
       >
         <ExposureControls
           isInternetExposed={repo.is_internet_exposed}
+          assetCriticality={repo.asset_criticality}
+          dataSensitivity={repo.data_sensitivity}
+          environment={repo.environment}
           onSetExposure={onSetExposure}
           settingExposure={settingExposure}
         />
@@ -958,51 +972,176 @@ function RepoRow({
 
 function ExposureControls({
   isInternetExposed,
+  assetCriticality,
+  dataSensitivity,
+  environment,
   onSetExposure,
   settingExposure,
 }: {
   isInternetExposed: boolean | null | undefined
-  onSetExposure: (isInternetExposed: boolean) => void
+  assetCriticality: Repo['asset_criticality']
+  dataSensitivity: Repo['data_sensitivity']
+  environment: Repo['environment']
+  onSetExposure: (input: Omit<RepoExposureUpdateInput, 'repoId'>) => void
   settingExposure: boolean
 }) {
   const { t } = useTranslation()
+  const canEditContext = isInternetExposed != null
+  const assetLabelMap: Record<Repo['asset_criticality'], string> = {
+    low: t('repositories.context.criticalityLow'),
+    medium: t('repositories.context.criticalityMedium'),
+    high: t('repositories.context.criticalityHigh'),
+    critical: t('repositories.context.criticalityCritical'),
+  }
+  const sensitivityLabelMap: Record<Repo['data_sensitivity'], string> = {
+    public: t('repositories.context.sensitivityPublic'),
+    internal: t('repositories.context.sensitivityInternal'),
+    confidential: t('repositories.context.sensitivityConfidential'),
+    restricted: t('repositories.context.sensitivityRestricted'),
+  }
+  const environmentLabelMap: Record<Repo['environment'], string> = {
+    dev: t('repositories.context.environmentDev'),
+    staging: t('repositories.context.environmentStaging'),
+    prod: t('repositories.context.environmentProd'),
+  }
+
+  const saveExposure = (nextExposure: boolean) => {
+    onSetExposure({
+      isInternetExposed: nextExposure,
+      assetCriticality,
+      dataSensitivity,
+      environment,
+    })
+  }
+
+  const saveContext = (next: Partial<Pick<RepoExposureUpdateInput, 'assetCriticality' | 'dataSensitivity' | 'environment'>>) => {
+    if (!canEditContext) return
+    const currentExposure = isInternetExposed as boolean
+    onSetExposure({
+      isInternetExposed: currentExposure,
+      assetCriticality: next.assetCriticality ?? assetCriticality,
+      dataSensitivity: next.dataSensitivity ?? dataSensitivity,
+      environment: next.environment ?? environment,
+    })
+  }
 
   return (
-    <div className="flex items-center gap-2">
-      <ExposureBadge isInternetExposed={isInternetExposed} />
-      <div
-        className="inline-flex items-center gap-1"
-        role="group"
-        aria-label={t('common.exposure.classification')}
-      >
-        <button
-          type="button"
-          onClick={() => onSetExposure(true)}
-          disabled={settingExposure || isInternetExposed === true}
-          title={t('common.exposure.markInternet')}
-          className={cn(
-            'rounded-md px-2 py-1 text-[11px] font-medium transition-colors disabled:opacity-50',
-            isInternetExposed === true
-              ? 'cursor-default bg-orange-100 text-orange-800 ring-1 ring-orange-300'
-              : 'bg-orange-50 text-orange-700 hover:bg-orange-100',
-          )}
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <ExposureBadge isInternetExposed={isInternetExposed} />
+        <div
+          className="inline-flex items-center gap-1"
+          role="group"
+          aria-label={t('common.exposure.classification')}
         >
-          {t('common.exposure.internet')}
-        </button>
-        <button
-          type="button"
-          onClick={() => onSetExposure(false)}
-          disabled={settingExposure || isInternetExposed === false}
-          title={t('common.exposure.markInternal')}
-          className={cn(
-            'rounded-md px-2 py-1 text-[11px] font-medium transition-colors disabled:opacity-50',
-            isInternetExposed === false
-              ? 'cursor-default bg-emerald-100 text-emerald-800 ring-1 ring-emerald-300'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
-          )}
+          <button
+            type="button"
+            onClick={() => saveExposure(true)}
+            disabled={settingExposure || isInternetExposed === true}
+            title={t('common.exposure.markInternet')}
+            className={cn(
+              'rounded-md px-2 py-1 text-[11px] font-medium transition-colors disabled:opacity-50',
+              isInternetExposed === true
+                ? 'cursor-default bg-orange-100 text-orange-800 ring-1 ring-orange-300'
+                : 'bg-orange-50 text-orange-700 hover:bg-orange-100',
+            )}
+          >
+            {t('common.exposure.internet')}
+          </button>
+          <button
+            type="button"
+            onClick={() => saveExposure(false)}
+            disabled={settingExposure || isInternetExposed === false}
+            title={t('common.exposure.markInternal')}
+            className={cn(
+              'rounded-md px-2 py-1 text-[11px] font-medium transition-colors disabled:opacity-50',
+              isInternetExposed === false
+                ? 'cursor-default bg-emerald-100 text-emerald-800 ring-1 ring-emerald-300'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
+            )}
+          >
+            {t('common.exposure.internal')}
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-1.5">
+        <select
+          value={assetCriticality}
+          disabled={settingExposure || !canEditContext}
+          onChange={(event) =>
+            saveContext({ assetCriticality: event.target.value as Repo['asset_criticality'] })
+          }
+          title={
+            canEditContext
+              ? t('repositories.context.assetCriticality')
+              : t('repositories.context.setExposureFirst')
+          }
+          className="rounded border border-gray-200 bg-white px-1.5 py-1 text-[11px] text-gray-700 disabled:opacity-50"
         >
-          {t('common.exposure.internal')}
-        </button>
+          <option value="low">{t('repositories.context.criticalityLow')}</option>
+          <option value="medium">{t('repositories.context.criticalityMedium')}</option>
+          <option value="high">{t('repositories.context.criticalityHigh')}</option>
+          <option value="critical">{t('repositories.context.criticalityCritical')}</option>
+        </select>
+
+        <select
+          value={dataSensitivity}
+          disabled={settingExposure || !canEditContext}
+          onChange={(event) =>
+            saveContext({ dataSensitivity: event.target.value as Repo['data_sensitivity'] })
+          }
+          title={
+            canEditContext
+              ? t('repositories.context.dataSensitivity')
+              : t('repositories.context.setExposureFirst')
+          }
+          className="rounded border border-gray-200 bg-white px-1.5 py-1 text-[11px] text-gray-700 disabled:opacity-50"
+        >
+          <option value="public">{t('repositories.context.sensitivityPublic')}</option>
+          <option value="internal">{t('repositories.context.sensitivityInternal')}</option>
+          <option value="confidential">{t('repositories.context.sensitivityConfidential')}</option>
+          <option value="restricted">{t('repositories.context.sensitivityRestricted')}</option>
+        </select>
+
+        <select
+          value={environment}
+          disabled={settingExposure || !canEditContext}
+          onChange={(event) =>
+            saveContext({ environment: event.target.value as Repo['environment'] })
+          }
+          title={
+            canEditContext
+              ? t('repositories.context.environment')
+              : t('repositories.context.setExposureFirst')
+          }
+          className="rounded border border-gray-200 bg-white px-1.5 py-1 text-[11px] text-gray-700 disabled:opacity-50"
+        >
+          <option value="dev">{t('repositories.context.environmentDev')}</option>
+          <option value="staging">{t('repositories.context.environmentStaging')}</option>
+          <option value="prod">{t('repositories.context.environmentProd')}</option>
+        </select>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-1">
+        <span
+          className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700 ring-1 ring-slate-200"
+          title={t('repositories.context.assetCriticality')}
+        >
+          {assetLabelMap[assetCriticality]}
+        </span>
+        <span
+          className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700 ring-1 ring-slate-200"
+          title={t('repositories.context.dataSensitivity')}
+        >
+          {sensitivityLabelMap[dataSensitivity]}
+        </span>
+        <span
+          className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700 ring-1 ring-slate-200"
+          title={t('repositories.context.environment')}
+        >
+          {environmentLabelMap[environment]}
+        </span>
       </div>
     </div>
   )

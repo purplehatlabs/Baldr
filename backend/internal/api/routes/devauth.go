@@ -15,13 +15,20 @@ import (
 )
 
 type DevAuthHandler struct {
-	tokens *auth.TokenService
-	db     *pgxpool.Pool
-	log    *zap.Logger
+	tokens  *auth.TokenService
+	session *auth.SessionTokens
+	db      *pgxpool.Pool
+	log     *zap.Logger
 }
 
 func NewDevAuthHandler(tokens *auth.TokenService, db *pgxpool.Pool, log *zap.Logger) *DevAuthHandler {
-	return &DevAuthHandler{tokens: tokens, db: db, log: log}
+	memberships := auth.NewMembershipStore(db)
+	return &DevAuthHandler{
+		tokens:  tokens,
+		session: auth.NewSessionTokens(tokens, memberships),
+		db:      db,
+		log:     log,
+	}
 }
 
 func (h *DevAuthHandler) Register(r gin.IRouter) {
@@ -52,7 +59,7 @@ func (h *DevAuthHandler) login(c *gin.Context) {
 		return
 	}
 
-	tokenStr, err := h.tokens.Issue(user.ID, user.TenantID, user.Email, string(user.Role))
+	tokenStr, err := h.session.IssueForUser(c.Request.Context(), user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not issue token"})
 		return
@@ -74,30 +81,15 @@ func (h *DevAuthHandler) upsertDevUser(ctx context.Context, email, name string) 
 		return &user, nil
 	}
 
-	// New user — create tenant + user
 	tx, err := h.db.Begin(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
-
-	tenantID := uuid.New()
-	_, err = tx.Exec(ctx,
-		`INSERT INTO tenants (id, name, slug, created_at) VALUES ($1, $2, $3, NOW())`,
-		tenantID, email, tenantID.String(),
-	)
-	if err != nil {
-		return nil, err
-	}
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	userID := uuid.New()
-	// dev users get a generated google_id so the unique constraint is satisfied
 	devGoogleID := "dev:" + userID.String()
-	_, err = tx.Exec(ctx,
-		`INSERT INTO users (id, tenant_id, email, google_id, name, avatar_url, role, auth_provider, created_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
-		userID, tenantID, email, devGoogleID, name, "", models.RoleOwner, auth.AuthProviderDev,
-	)
+	tenantID, err := auth.NewUserStore(h.db).CreateDevTenantWithAdmin(ctx, tx, userID, email, name, devGoogleID)
 	if err != nil {
 		return nil, err
 	}
@@ -108,6 +100,6 @@ func (h *DevAuthHandler) upsertDevUser(ctx context.Context, email, name string) 
 
 	return &models.User{
 		ID: userID, TenantID: tenantID,
-		Email: email, Name: name, Role: models.RoleOwner,
+		Email: email, Name: name, Role: models.RoleAdmin,
 	}, nil
 }

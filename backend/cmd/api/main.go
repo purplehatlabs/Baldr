@@ -18,6 +18,7 @@ import (
 	"github.com/purplehatlabs/Baldr/internal/config"
 	"github.com/purplehatlabs/Baldr/internal/db"
 	githubclient "github.com/purplehatlabs/Baldr/internal/github"
+	"github.com/purplehatlabs/Baldr/internal/llm"
 	"github.com/purplehatlabs/Baldr/internal/queue"
 	"github.com/purplehatlabs/Baldr/internal/scheduler"
 	"go.uber.org/zap"
@@ -25,7 +26,7 @@ import (
 
 func main() {
 	log, _ := zap.NewProduction()
-	defer log.Sync()
+	defer func() { _ = log.Sync() }()
 
 	cfg := config.Load()
 
@@ -52,12 +53,34 @@ func main() {
 		log.Fatal("create scheduler", zap.Error(err))
 	}
 
+	modelValidator := llm.NewModelValidator(cfg.LiteLLMBaseURL, cfg.LiteLLMAPIKey, log)
+	aliases := []string{cfg.LiteLLMModel}
+	if cfg.LiteLLMAgenticModel != "" {
+		aliases = append(aliases, cfg.LiteLLMAgenticModel)
+	}
+	if cfg.LiteLLMTranslationModel != "" {
+		aliases = append(aliases, cfg.LiteLLMTranslationModel)
+	}
+	modelValidator.ValidateRequiredAliases(context.Background(), aliases...)
+
+	leader, err := scheduler.NewLeaderElector(cfg.RedisURL, log)
+	if err != nil {
+		log.Fatal("create scheduler leader elector", zap.Error(err))
+	}
+	defer func() { _ = leader.Close() }()
+
 	bgCtx, bgCancel := context.WithCancel(context.Background())
 	defer bgCancel()
-	sched.Start(bgCtx)
-	defer sched.Stop()
+	go leader.Run(bgCtx, func(leadCtx context.Context) {
+		sched.StartCron(leadCtx)
+		<-leadCtx.Done()
+		sched.StopCron()
+	})
+	defer sched.Close()
 
 	tokens := auth.NewTokenService(cfg.JWTSecret)
+	memberships := auth.NewMembershipStore(pool)
+	authMW := middleware.Auth(tokens, memberships)
 
 	var googleProvider *auth.GoogleProvider
 	if cfg.GoogleSSOEnabled && cfg.GoogleClientID != "" {
@@ -67,8 +90,6 @@ func main() {
 	if cfg.GitHubSSOEnabled && cfg.GitHubClientID != "" {
 		githubProvider = auth.NewGitHubProvider(cfg.GitHubClientID, cfg.GitHubClientSecret, cfg.GitHubRedirectURL)
 	}
-
-	authMW := middleware.Auth(tokens)
 
 	r := gin.New()
 	if cfg.DevAuthEnabled {
@@ -97,6 +118,13 @@ func main() {
 	})
 	authHandler.Register(r)
 	authHandler.RegisterProtected(r, authMW)
+	routes.NewMembersHandler(pool, log).Register(r, authMW)
+	routes.NewInvitesHandler(routes.AuthHandlerConfig{
+		Tokens:          tokens,
+		DB:              pool,
+		Log:             log,
+		FrontendBaseURL: cfg.FrontendBaseURL,
+	}).Register(r, authMW)
 
 	if cfg.DevAuthEnabled {
 		routes.NewDevAuthHandler(tokens, pool, log).Register(r)
@@ -104,7 +132,7 @@ func main() {
 
 	ghClient := githubclient.NewClient(pool, cfg.PEMEncryptionKey)
 	asynqClient := asynq.NewClient(redisOpt)
-	defer asynqClient.Close()
+	defer func() { _ = asynqClient.Close() }()
 	enqueuer := queue.NewEnqueuer(asynqClient)
 
 	routes.NewOrgsHandler(pool, ghClient, sched, enqueuer, cfg.GitHubMembershipSyncEnabled, log).Register(r, authMW)
@@ -123,8 +151,9 @@ func main() {
 	routes.NewWebhookHandler(pool, sched, cfg.GitHubWebhookSecret, log).Register(r)
 
 	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%s", cfg.APIPort),
-		Handler: r,
+		Addr:              fmt.Sprintf(":%s", cfg.APIPort),
+		Handler:           r,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	go func() {

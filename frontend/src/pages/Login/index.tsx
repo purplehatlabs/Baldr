@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { ShieldCheck, Terminal, AlertCircle } from 'lucide-react'
@@ -11,11 +11,20 @@ import {
   isGoogleSSOEnabled,
   devLogin,
 } from '@/api/auth'
+import { getNextPathFromSearch, savePostLoginRedirect } from '@/lib/postLoginRedirect'
 
 export default function LoginPage() {
   const { t } = useTranslation()
+  const location = useLocation()
   const githubEnabled = isGitHubSSOEnabled()
   const googleEnabled = isGoogleSSOEnabled()
+  const nextPath = useMemo(() => getNextPathFromSearch(location.search), [location.search])
+
+  useEffect(() => {
+    if (nextPath) {
+      savePostLoginRedirect(nextPath)
+    }
+  }, [nextPath])
 
   const features = [
     { value: '30+', label: t('login.features.ecosystems') },
@@ -44,7 +53,7 @@ export default function LoginPage() {
 
           {githubEnabled && (
             <a
-              href={getGitHubLoginURL()}
+              href={getGitHubLoginURL(nextPath ?? undefined)}
               className="flex items-center justify-center gap-3 w-full py-3 px-4 rounded-xl bg-gray-900 hover:bg-gray-800 transition-colors text-white font-medium shadow-sm border border-white/10"
             >
               <GitHubIcon />
@@ -54,7 +63,7 @@ export default function LoginPage() {
 
           {googleEnabled && (
             <a
-              href={getGoogleLoginURL()}
+              href={getGoogleLoginURL(nextPath ?? undefined)}
               className={`flex items-center justify-center gap-3 w-full py-3 px-4 rounded-xl transition-colors font-medium shadow-sm ${
                 githubEnabled
                   ? 'bg-white/10 hover:bg-white/15 text-white border border-white/10'
@@ -73,7 +82,7 @@ export default function LoginPage() {
                 <span className="text-gray-600 text-xs">{t('login.or')}</span>
                 <div className="flex-1 h-px bg-white/10" />
               </div>
-              <DevLoginForm />
+              <DevLoginForm nextPath={nextPath} />
             </>
           )}
 
@@ -93,7 +102,7 @@ export default function LoginPage() {
   )
 }
 
-function DevLoginForm() {
+function DevLoginForm({ nextPath }: { nextPath: string | null }) {
   const { t } = useTranslation()
   const [email, setEmail] = useState('dev@example.com')
   const [name, setName] = useState('Dev User')
@@ -105,7 +114,7 @@ function DevLoginForm() {
     mutationFn: () => devLogin(email, name),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['auth', 'me'] })
-      navigate('/', { replace: true })
+      navigate(nextPath ?? '/', { replace: true })
     },
     onError: () => setError(t('login.devLoginError')),
   })

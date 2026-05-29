@@ -51,7 +51,7 @@ func (g *GitHubProvider) Exchange(ctx context.Context, code string) (*GitHubUser
 	if err != nil {
 		return nil, fmt.Errorf("fetch user: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("user endpoint returned status %d", resp.StatusCode)
@@ -87,7 +87,7 @@ func (g *GitHubProvider) fetchPrimaryEmail(ctx context.Context, client *http.Cli
 	if err != nil {
 		return "", fmt.Errorf("fetch emails: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("emails endpoint returned status %d", resp.StatusCode)

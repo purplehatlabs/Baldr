@@ -58,8 +58,8 @@ func New(redisOpt asynq.RedisConnOpt, db *pgxpool.Pool, log *zap.Logger, members
 	}, nil
 }
 
-// Start launches the scheduler and syncs org crons every 5 minutes.
-func (s *OrgScheduler) Start(ctx context.Context) {
+// StartCron launches cron scheduling and org sync loops. Call only on the elected leader.
+func (s *OrgScheduler) StartCron(ctx context.Context) {
 	s.scheduler.Start()
 	s.registerMetricsSnapshotJob()
 	s.registerExceptionExpiryJob()
@@ -82,6 +82,17 @@ func (s *OrgScheduler) Start(ctx context.Context) {
 			}
 		}
 	}()
+}
+
+// StopCron stops cron scheduling without closing the asynq client used for manual enqueues.
+func (s *OrgScheduler) StopCron() {
+	_ = s.scheduler.Shutdown()
+}
+
+// Start launches the scheduler and syncs org crons every 5 minutes.
+// Deprecated: prefer StartCron behind leader election.
+func (s *OrgScheduler) Start(ctx context.Context) {
+	s.StartCron(ctx)
 }
 
 func (s *OrgScheduler) registerMetricsSnapshotJob() {
@@ -332,9 +343,14 @@ func (s *OrgScheduler) enqueueDailyMaliciousDatasetSync(ctx context.Context) {
 	s.log.Info("enqueued malicious dataset task")
 }
 
-func (s *OrgScheduler) Stop() {
-	_ = s.scheduler.Shutdown()
+// Close releases the asynq client. Safe to call on process shutdown.
+func (s *OrgScheduler) Close() {
 	_ = s.client.Close()
+}
+
+func (s *OrgScheduler) Stop() {
+	s.StopCron()
+	s.Close()
 }
 
 // sync loads all active orgs from the DB and registers/updates their cron jobs.

@@ -20,7 +20,10 @@
     "defaultTitle": "DevSecOps"
   },
   "header": {
-    "logout": "Sign out"
+    "logout": "Sign out",
+    "tenantSwitcher": {
+      "label": "Switch workspace"
+    }
   },
   "login": {
     "tagline": "Dependency vulnerability analysis for your entire organization",
@@ -43,6 +46,11 @@
       "database": "Database"
     }
   },
+  "invite": {
+    "invalidLink": "Invalid invite link.",
+    "acceptSuccess": "Invite accepted. Redirecting…",
+    "acceptFailed": "Could not accept invite."
+  },
   "settings": {
     "language": {
       "title": "Language",
@@ -52,6 +60,29 @@
       "ptBR": "Portuguese (Brazil)",
       "saved": "Language updated.",
       "saveError": "Could not update language."
+    },
+    "members": {
+      "title": "Workspace members",
+      "description": "Manage roles and invitations for this workspace. Changes take effect immediately and sign out affected users.",
+      "listTitle": "Members",
+      "empty": "No members found.",
+      "roleLabel": "Role",
+      "statusLabel": "Status",
+      "roleMember": "Member",
+      "roleAdmin": "Admin",
+      "roleOwner": "Owner",
+      "statusActive": "Active",
+      "statusInactive": "Inactive",
+      "inviteTitle": "Invite by email",
+      "inviteDescription": "Send an invite link to add someone to this workspace. They must sign in with the invited email to accept.",
+      "inviteEmailPlaceholder": "colleague@company.com",
+      "sendInvite": "Send invite",
+      "inviting": "Sending…",
+      "inviteFailed": "Could not create invite.",
+      "inviteExpires": "Expires {{value}}",
+      "copyInviteLink": "Copy invite link",
+      "copied": "Copied",
+      "revokeInvite": "Revoke invite"
     },
     "orgs": {
       "title": "GitHub Organizations",
@@ -116,6 +147,14 @@
       "autoAnalysisHigh": "High and Critical",
       "autoAnalysisMedium": "Medium, High and Critical",
       "autoAnalysisHint": "Findings below this threshold remain in manual triage without running the LLM agent automatically after the scan.",
+      "defaultModel": "Default model *",
+      "defaultModelHint": "Used when agentic or translation model is not set.",
+      "agenticModel": "Agentic analysis model",
+      "agenticModelHint": "Model for multi-turn code investigation. Falls back to default model when empty.",
+      "translationModel": "Translation model",
+      "translationModelHint": "Model for pt-BR translation. Falls back to default model when empty.",
+      "batchEnabled": "Use Batch API when possible",
+      "batchEnabledHint": "Scan-triggered translation may run via OpenAI Batch API with automatic realtime fallback. Agentic analysis always runs in realtime.",
       "apiKey": "API Key",
       "apiKeyKeep": "(leave blank to keep current)",
       "apiKeyNoChange": "••••••••  (do not change)",
@@ -158,12 +197,15 @@
       "suppress": "Suppress",
       "reopen": "Reopen",
       "markFixed": "Mark as fixed",
+      "reanalyze": "Re-analyze (AI)",
       "assign": "Assign",
       "apply": "Apply bulk action",
       "applying": "Applying...",
       "clearSelection": "Clear selection",
       "assignPlaceholder": "user_id for assignment",
-      "assignTitle": "Enter user_id for assignment audit"
+      "assignTitle": "Enter user_id for assignment audit",
+      "resultDefault": "Bulk action applied to {{count}} findings.",
+      "resultReanalyze": "Re-analysis queued: {{enqueued}}. Already queued/running: {{alreadyQueued}}. Manual-only skipped: {{skippedManual}}. Failures: {{failed}}."
     },
     "ai": {
       "title": "AI Analysis",
@@ -521,6 +563,23 @@
     "scanning": "Queuing…",
     "scanRunning": "Running…",
     "scanQueued": "Queued…",
+    "context": {
+      "setExposureFirst": "Set exposure before editing context",
+      "assetCriticality": "Asset criticality",
+      "dataSensitivity": "Data sensitivity",
+      "environment": "Environment",
+      "criticalityLow": "Asset: low",
+      "criticalityMedium": "Asset: medium",
+      "criticalityHigh": "Asset: high",
+      "criticalityCritical": "Asset: critical",
+      "sensitivityPublic": "Data: public",
+      "sensitivityInternal": "Data: internal",
+      "sensitivityConfidential": "Data: confidential",
+      "sensitivityRestricted": "Data: restricted",
+      "environmentDev": "Env: dev",
+      "environmentStaging": "Env: staging",
+      "environmentProd": "Env: prod"
+    },
     "browse": {
       "title": "Repositories in {{org}}",
       "subtitle": "Listed directly from GitHub",

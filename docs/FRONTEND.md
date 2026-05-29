@@ -20,7 +20,9 @@
 frontend/src/
 ├── api/                  # Fetch functions + domain types
 │   ├── client.ts         # axios instance with cookies and 401 interceptor
-│   ├── auth.ts           # getMe, logout, devLogin, isDevAuthEnabled
+│   ├── auth.ts           # getMe, getAuthTenants, switchTenant, logout, devLogin
+│   ├── members.ts        # listMembers, updateMember (admin)
+│   ├── invites.ts        # listInvites, createInvite, revokeInvite, acceptInvite
 │   ├── dashboard.ts      # getDashboard → DashboardSummary
 │   ├── orgs.ts           # listOrgs, createOrg, deleteOrg → Org
 │   ├── repos.ts          # listRepos, triggerScan, listScanJobs → Repo, ScanJob
@@ -46,7 +48,8 @@ frontend/src/
     ├── Repositories/       # Repo list, manual scan
     ├── Findings/           # Filtered table + detail panel
     ├── Teams/              # Expandable cards per team
-    └── Settings/           # Manage GitHub orgs
+    ├── Settings/           # Language, members/invites (admin), GitHub orgs, GitHub App, LLM
+    └── AcceptInvite/       # Accept workspace invite token
 ```
 
 ## Adding a new page
@@ -233,13 +236,24 @@ Defined in `.env` and passed by Docker Compose via `environment:`.
 import { useAuth } from '@/hooks/useAuth'
 
 function MyComponent() {
-  const { user, isAuthenticated, isLoading, logout } = useAuth()
-  // user: User | undefined
-  // isAuthenticated: boolean
+  const {
+    user,
+    tenants,
+    activeTenant,
+    isAuthenticated,
+    isLoading,
+    logout,
+    switchTenant,
+    isSwitchingTenant,
+  } = useAuth()
 }
 ```
 
-`useAuth` uses `queryKey: ['auth', 'me']`. To force a re-fetch after login:
+`Header` renders `TenantSwitcher` when the user has more than one active tenant membership.
+
+On tenant switch, `useAuth` invalidates `auth` queries and clears non-auth React Query cache to avoid cross-tenant data bleed, then navigates to `/overview`.
+
+`useAuth` uses `queryKey: ['auth', 'me']` and `['auth', 'tenants']`. To force a re-fetch after login:
 ```tsx
 queryClient.invalidateQueries({ queryKey: ['auth', 'me'] })
 ```

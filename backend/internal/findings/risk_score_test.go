@@ -172,6 +172,36 @@ func TestCalculateRiskScore_InternetExposedExploitableMinimumHigh(t *testing.T) 
 	}
 }
 
+func TestCalculateRiskScore_CriticalReachableExposedExploitableForcesCritical(t *testing.T) {
+	exploit := models.ExploitHigh
+	result := CalculateRiskScore(RiskScoreInput{
+		Severity:              models.SeverityCritical,
+		Status:                models.FindingOpen,
+		FirstSeenAt:           time.Now().UTC(),
+		ReachabilityStatus:    models.ReachabilityReachable,
+		Exploitability:        &exploit,
+		IsInternetExposed:     boolPtr(true),
+		HasContextualAnalysis: true,
+	}, time.Now().UTC())
+
+	if result.Tier != models.RiskTierCritical {
+		t.Fatalf("expected forced critical tier override, got %s", result.Tier)
+	}
+}
+
+func TestCalculateRiskScore_ProductionAliasMapsToProd(t *testing.T) {
+	scoreProd, _ := calculateBusinessScore(RiskScoreInput{
+		Environment: "prod",
+	})
+	scoreProduction, _ := calculateBusinessScore(RiskScoreInput{
+		Environment: "production",
+	})
+
+	if scoreProduction != scoreProd {
+		t.Fatalf("expected production alias to match prod score, got production=%f prod=%f", scoreProduction, scoreProd)
+	}
+}
+
 func floatPtr(v float64) *float64 {
 	return &v
 }

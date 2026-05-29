@@ -24,7 +24,7 @@ func ScanManifest(_ context.Context, manifest Manifest) ([]internalmodels.Findin
 		LockfilePaths: []string{manifest.AbsPath},
 	}
 
-	results, err := osvscanner.DoScan(actions, nil)
+	results, err := osvscanner.DoScan(actions)
 	if err != nil && !isErrVulnsFound(err) {
 		return nil, fmt.Errorf("osv-scanner scan %s: %w", manifest.Path, err)
 	}
@@ -59,27 +59,30 @@ func mapResults(results models.VulnerabilityResults, manifest Manifest) []intern
 	for _, sourceResult := range results.Results {
 		for _, pkg := range sourceResult.Packages {
 			for _, vuln := range pkg.Vulnerabilities {
+				if vuln == nil {
+					continue
+				}
 				severity, cvss := classifySeverity(vuln)
 
 				finding := internalmodels.Finding{
 					ID:             uuid.New(),
-					OSVID:          vuln.ID,
+					OSVID:          vuln.GetId(),
 					PackageName:    pkg.Package.Name,
 					PackageVersion: pkg.Package.Version,
 					Severity:       severity,
 					CVSSScore:      cvss,
-					Summary:        vuln.Summary,
-					Details:        vuln.Details,
+					Summary:        vuln.GetSummary(),
+					Details:        vuln.GetDetails(),
 					Status:         internalmodels.FindingOpen,
 					FirstSeenAt:    time.Now(),
 					LastSeenAt:     time.Now(),
 				}
 
-				for _, affected := range vuln.Affected {
-					for _, r := range affected.Ranges {
-						for _, event := range r.Events {
-							if event.Fixed != "" {
-								v := event.Fixed
+				for _, affected := range vuln.GetAffected() {
+					for _, r := range affected.GetRanges() {
+						for _, event := range r.GetEvents() {
+							if event.GetFixed() != "" {
+								v := event.GetFixed()
 								finding.FixedVersion = &v
 								goto nextAffected
 							}

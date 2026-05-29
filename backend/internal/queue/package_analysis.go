@@ -159,13 +159,7 @@ func (h *packageDynamicAnalysisHandler) Handle(ctx context.Context, t *asynq.Tas
 		return fmt.Errorf("%w: package analysis endpoint not configured", asynq.SkipRetry)
 	}
 
-	reqPayload, err := json.Marshal(packageDynamicAnalysisRequest{
-		TenantID:        payload.TenantID,
-		Ecosystem:       payload.Ecosystem,
-		PackageName:     payload.PackageName,
-		PackageVersion:  payload.PackageVersion,
-		TriggerSignalID: payload.TriggerSignalID,
-	})
+	reqPayload, err := json.Marshal(packageDynamicAnalysisRequest(payload))
 	if err != nil {
 		h.failRun(ctx, runID, "marshal request payload failed")
 		return fmt.Errorf("%w: marshal package dynamic analysis request: %v", asynq.SkipRetry, err)
@@ -185,7 +179,7 @@ func (h *packageDynamicAnalysisHandler) Handle(ctx context.Context, t *asynq.Tas
 		h.failRun(ctx, runID, err.Error())
 		return fmt.Errorf("%w: package dynamic analysis call failed: %v", asynq.SkipRetry, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {

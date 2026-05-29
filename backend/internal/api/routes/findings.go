@@ -176,7 +176,7 @@ func (h *FindingsHandler) resolveUserLocale(ctx context.Context, c *gin.Context)
 	err := h.db.QueryRow(ctx, `
 		SELECT COALESCE(NULLIF(language, ''), 'en')
 		FROM users
-		WHERE id = $1 AND tenant_id = $2`, claims.UserID, claims.TenantID,
+		WHERE id = $1`, claims.UserID,
 	).Scan(&language)
 	if err != nil {
 		return i18n.DefaultLocale
@@ -638,7 +638,7 @@ func (h *FindingsHandler) topRisks(c *gin.Context) {
 
 func (h *FindingsHandler) createManual(c *gin.Context) {
 	claims := middleware.ClaimsFrom(c)
-	if claims.Role != string(models.RoleAdmin) && claims.Role != string(models.RoleOwner) {
+	if !middleware.HasRole(claims.Role, models.RoleOwner, models.RoleAdmin) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "admin or owner role required"})
 		return
 	}
@@ -685,7 +685,7 @@ func (h *FindingsHandler) createManual(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 		return
 	}
-	defer tx.Rollback(c.Request.Context())
+	defer func() { _ = tx.Rollback(c.Request.Context()) }()
 
 	err = tx.QueryRow(c.Request.Context(), `
 		INSERT INTO findings (
@@ -807,7 +807,7 @@ func (h *FindingsHandler) update(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 		return
 	}
-	defer tx.Rollback(c.Request.Context())
+	defer func() { _ = tx.Rollback(c.Request.Context()) }()
 
 	var previousStatus string
 	err = tx.QueryRow(c.Request.Context(), `
@@ -921,7 +921,7 @@ func (h *FindingsHandler) respondTriageError(c *gin.Context, err error) {
 }
 
 type bulkActionRequest struct {
-	Action         string      `json:"action" binding:"required,oneof=assign suppress reopen mark_fixed"`
+	Action         string      `json:"action" binding:"required,oneof=assign suppress reopen mark_fixed reanalyze"`
 	FindingIDs     []uuid.UUID `json:"finding_ids" binding:"required,min=1"`
 	AssignedUserID *uuid.UUID  `json:"assigned_user_id"`
 }
@@ -945,10 +945,10 @@ func (h *FindingsHandler) bulkActions(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 		return
 	}
-	defer tx.Rollback(c.Request.Context())
+	defer func() { _ = tx.Rollback(c.Request.Context()) }()
 
 	rows, err := tx.Query(c.Request.Context(), `
-		SELECT f.id, f.status
+		SELECT f.id, f.status, f.scan_job_id
 		FROM findings f
 		WHERE f.tenant_id = $1
 		  AND f.id = ANY($2)`,
@@ -961,15 +961,17 @@ func (h *FindingsHandler) bulkActions(c *gin.Context) {
 	defer rows.Close()
 
 	found := make([]struct {
-		ID     uuid.UUID
-		Status string
+		ID        uuid.UUID
+		Status    string
+		ScanJobID *uuid.UUID
 	}, 0, len(req.FindingIDs))
 	for rows.Next() {
 		var row struct {
-			ID     uuid.UUID
-			Status string
+			ID        uuid.UUID
+			Status    string
+			ScanJobID *uuid.UUID
 		}
-		if err := rows.Scan(&row.ID, &row.Status); err != nil {
+		if err := rows.Scan(&row.ID, &row.Status, &row.ScanJobID); err != nil {
 			continue
 		}
 		found = append(found, row)
@@ -1039,16 +1041,68 @@ func (h *FindingsHandler) bulkActions(c *gin.Context) {
 		return
 	}
 
-	for _, item := range found {
-		if err := h.prioritization.RecalculateRiskScore(c.Request.Context(), item.ID, claims.TenantID); err != nil {
-			h.log.Warn("recalculate risk score after bulk action", zap.Error(err))
+	reanalyzeEnqueued := 0
+	reanalyzeAlreadyQueued := 0
+	reanalyzeSkippedManual := 0
+	reanalyzeFailed := 0
+
+	if req.Action == "reanalyze" {
+		for _, item := range found {
+			if item.ScanJobID == nil {
+				reanalyzeSkippedManual++
+				continue
+			}
+
+			analysisID, created, err := h.analysis.EnqueueAnalysis(
+				c.Request.Context(),
+				item.ID,
+				claims.TenantID,
+				item.ScanJobID,
+				models.AnalysisTriggerManual,
+				true,
+			)
+			if err != nil {
+				reanalyzeFailed++
+				h.log.Warn("bulk reanalyze: prepare finding analysis",
+					zap.String("finding_id", item.ID.String()),
+					zap.Error(err),
+				)
+				continue
+			}
+
+			if !created {
+				reanalyzeAlreadyQueued++
+				continue
+			}
+
+			if err := h.enqueuer.EnqueueFindingAnalysis(analysisID, item.ID, claims.TenantID); err != nil {
+				reanalyzeFailed++
+				h.log.Warn("bulk reanalyze: enqueue finding analysis",
+					zap.String("finding_id", item.ID.String()),
+					zap.String("analysis_id", analysisID.String()),
+					zap.Error(err),
+				)
+				continue
+			}
+
+			reanalyzeEnqueued++
+		}
+	} else {
+		for _, item := range found {
+			if err := h.prioritization.RecalculateRiskScore(c.Request.Context(), item.ID, claims.TenantID); err != nil {
+				h.log.Warn("recalculate risk score after bulk action", zap.Error(err))
+			}
 		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"ok":            true,
-		"action":        req.Action,
-		"matched_count": len(found),
+		"ok":                       true,
+		"action":                   req.Action,
+		"matched_count":            len(found),
+		"reanalyze_enqueued":       reanalyzeEnqueued,
+		"reanalyze_already_queued": reanalyzeAlreadyQueued,
+		"reanalyze_skipped_manual": reanalyzeSkippedManual,
+		"reanalyze_failed":         reanalyzeFailed,
 	})
 }
 

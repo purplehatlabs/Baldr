@@ -1,14 +1,14 @@
 package llm
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 const AgentPromptVersion = "v2-agent"
@@ -31,6 +31,14 @@ type ChatMessage struct {
 	Content    string
 	ToolCalls  []ToolCall
 	ToolCallID string
+	Cacheable  bool
+}
+
+type CompletionUsage struct {
+	PromptTokens             int `json:"prompt_tokens"`
+	CompletionTokens         int `json:"completion_tokens"`
+	CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+	CacheReadInputTokens     int `json:"cache_read_input_tokens"`
 }
 
 type AgentClient struct {
@@ -38,9 +46,10 @@ type AgentClient struct {
 	apiKey     string
 	model      string
 	httpClient *http.Client
+	log        *zap.Logger
 }
 
-func NewAgentClient(s Settings) *AgentClient {
+func NewAgentClient(s Settings, log *zap.Logger) *AgentClient {
 	timeout := time.Duration(s.TimeoutSeconds) * time.Second
 	if timeout <= 0 {
 		timeout = 120 * time.Second
@@ -48,8 +57,9 @@ func NewAgentClient(s Settings) *AgentClient {
 	return &AgentClient{
 		baseURL:    strings.TrimRight(s.BaseURL, "/"),
 		apiKey:     s.APIKey,
-		model:      s.Model,
+		model:      s.ResolveAgenticModel(),
 		httpClient: &http.Client{Timeout: timeout},
+		log:        log,
 	}
 }
 
@@ -125,72 +135,168 @@ func (c *AgentClient) ToolDefinitions() []map[string]any {
 	}
 }
 
-func (c *AgentClient) Chat(ctx context.Context, messages []ChatMessage, tools []map[string]any) (ChatMessage, error) {
+func (c *AgentClient) Chat(ctx context.Context, messages []ChatMessage, tools []map[string]any) (ChatMessage, CompletionUsage, error) {
+	allowPromptCache := len(tools) == 0 && !hasSystemMessage(messages)
 	payloadMessages := make([]map[string]any, 0, len(messages))
 	for _, m := range messages {
-		msg := map[string]any{"role": m.Role}
-		if m.Content != "" {
-			msg["content"] = m.Content
-		}
-		if m.ToolCallID != "" {
-			msg["tool_call_id"] = m.ToolCallID
-		}
-		if len(m.ToolCalls) > 0 {
-			toolCalls := make([]map[string]any, 0, len(m.ToolCalls))
-			for _, tc := range m.ToolCalls {
-				toolCalls = append(toolCalls, map[string]any{
-					"id":   tc.ID,
-					"type": "function",
-					"function": map[string]any{
-						"name":      tc.Name,
-						"arguments": string(tc.Arguments),
-					},
-				})
-			}
-			msg["tool_calls"] = toolCalls
-		}
-		payloadMessages = append(payloadMessages, msg)
+		payloadMessages = append(payloadMessages, encodeChatMessage(m, allowPromptCache))
 	}
 
-	body, err := json.Marshal(map[string]any{
+	bodyMap := map[string]any{
 		"model":       c.model,
 		"messages":    payloadMessages,
 		"tools":       tools,
 		"tool_choice": "auto",
 		"temperature": 0.2,
-	})
+	}
+	body, err := json.Marshal(bodyMap)
 	if err != nil {
-		return ChatMessage{}, fmt.Errorf("marshal request: %w", err)
+		return ChatMessage{}, CompletionUsage{}, fmt.Errorf("marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/v1/chat/completions", bytes.NewReader(body))
+	msg, usage, err := c.doChat(ctx, body)
 	if err != nil {
-		return ChatMessage{}, fmt.Errorf("create request: %w", err)
+		return ChatMessage{}, usage, err
 	}
-	req.Header.Set("Content-Type", "application/json")
-	if c.apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+c.apiKey)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return ChatMessage{}, fmt.Errorf("call litellm: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return ChatMessage{}, fmt.Errorf("read response: %w", err)
-	}
-	if resp.StatusCode >= 400 {
-		return ChatMessage{}, fmt.Errorf("litellm returned %d: %s", resp.StatusCode, truncate(string(respBody), 500))
-	}
-
-	return parseAssistantMessage(respBody)
+	c.logCacheUsage(usage)
+	return msg, usage, nil
 }
 
-func parseAssistantMessage(body []byte) (ChatMessage, error) {
+func (c *AgentClient) FinalizeStructuredResult(ctx context.Context, messages []ChatMessage) (*AgentAnalysisResult, CompletionUsage, error) {
+	allowPromptCache := !hasSystemMessage(messages)
+	payloadMessages := make([]map[string]any, 0, len(messages)+1)
+	for _, m := range messages {
+		payloadMessages = append(payloadMessages, encodeChatMessage(m, allowPromptCache))
+	}
+	payloadMessages = append(payloadMessages, map[string]any{
+		"role":    "user",
+		"content": "Return your final assessment now as JSON only, matching the required schema.",
+	})
+
+	body, err := json.Marshal(map[string]any{
+		"model":    c.model,
+		"messages": payloadMessages,
+		"response_format": map[string]string{
+			"type": "json_object",
+		},
+		"temperature": 0.1,
+	})
+	if err != nil {
+		return nil, CompletionUsage{}, fmt.Errorf("marshal finalize request: %w", err)
+	}
+
+	msg, usage, err := c.doChat(ctx, body)
+	if err != nil {
+		return nil, usage, err
+	}
+	c.logCacheUsage(usage)
+
+	result, err := ParseAgentAnalysisResult(msg.Content)
+	if err != nil {
+		return nil, usage, err
+	}
+	return result, usage, nil
+}
+
+func (c *AgentClient) doChat(ctx context.Context, body []byte) (ChatMessage, CompletionUsage, error) {
+	req, err := newChatCompletionRequest(ctx, c.baseURL, c.apiKey, body)
+	if err != nil {
+		return ChatMessage{}, CompletionUsage{}, err
+	}
+
+	respBody, statusCode, err := doChatCompletionWithRetry(ctx, c.httpClient, req)
+	if err != nil {
+		return ChatMessage{}, CompletionUsage{}, err
+	}
+	if statusCode >= 400 {
+		return ChatMessage{}, CompletionUsage{}, fmt.Errorf("litellm returned %d: %s", statusCode, truncate(string(respBody), 500))
+	}
+
+	msg, usage, err := parseAssistantMessageWithUsage(respBody)
+	if err != nil {
+		return ChatMessage{}, usage, err
+	}
+	return msg, usage, nil
+}
+
+func encodeChatMessage(m ChatMessage, allowPromptCache bool) map[string]any {
+	if m.ToolCallID != "" {
+		return map[string]any{
+			"role":         m.Role,
+			"content":      m.Content,
+			"tool_call_id": m.ToolCallID,
+		}
+	}
+	if len(m.ToolCalls) > 0 {
+		toolCalls := make([]map[string]any, 0, len(m.ToolCalls))
+		for _, tc := range m.ToolCalls {
+			toolCalls = append(toolCalls, map[string]any{
+				"id":   tc.ID,
+				"type": "function",
+				"function": map[string]any{
+					"name":      tc.Name,
+					"arguments": string(tc.Arguments),
+				},
+			})
+		}
+		msg := map[string]any{"role": m.Role, "tool_calls": toolCalls}
+		if m.Content != "" {
+			msg["content"] = m.Content
+		}
+		return msg
+	}
+	if allowPromptCache && m.Cacheable && m.Content != "" {
+		return map[string]any{
+			"role": m.Role,
+			"content": []map[string]any{
+				{
+					"type": "text",
+					"text": m.Content,
+					"cache_control": map[string]string{
+						"type": "ephemeral",
+					},
+				},
+			},
+		}
+	}
+	msg := map[string]any{"role": m.Role}
+	if m.Content != "" {
+		msg["content"] = m.Content
+	}
+	return msg
+}
+
+func hasSystemMessage(messages []ChatMessage) bool {
+	for _, m := range messages {
+		if strings.EqualFold(m.Role, "system") {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *AgentClient) logCacheUsage(usage CompletionUsage) {
+	if c.log == nil {
+		return
+	}
+	if usage.CacheReadInputTokens == 0 && usage.CacheCreationInputTokens == 0 {
+		return
+	}
+	c.log.Info("agent prompt cache usage",
+		zap.Int("prompt_tokens", usage.PromptTokens),
+		zap.Int("cache_creation_input_tokens", usage.CacheCreationInputTokens),
+		zap.Int("cache_read_input_tokens", usage.CacheReadInputTokens),
+	)
+}
+
+func parseAssistantMessageWithUsage(body []byte) (ChatMessage, CompletionUsage, error) {
 	var resp struct {
+		Usage struct {
+			PromptTokens             int `json:"prompt_tokens"`
+			CompletionTokens         int `json:"completion_tokens"`
+			CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+			CacheReadInputTokens     int `json:"cache_read_input_tokens"`
+		} `json:"usage"`
 		Choices []struct {
 			Message struct {
 				Role      string `json:"role"`
@@ -207,10 +313,10 @@ func parseAssistantMessage(body []byte) (ChatMessage, error) {
 		} `json:"choices"`
 	}
 	if err := json.Unmarshal(body, &resp); err != nil {
-		return ChatMessage{}, fmt.Errorf("parse chat completion: %w", err)
+		return ChatMessage{}, CompletionUsage{}, fmt.Errorf("parse chat completion: %w", err)
 	}
 	if len(resp.Choices) == 0 {
-		return ChatMessage{}, fmt.Errorf("empty llm response")
+		return ChatMessage{}, CompletionUsage{}, fmt.Errorf("empty llm response")
 	}
 	msg := resp.Choices[0].Message
 	out := ChatMessage{Role: msg.Role, Content: msg.Content}
@@ -221,7 +327,13 @@ func parseAssistantMessage(body []byte) (ChatMessage, error) {
 			Arguments: json.RawMessage(tc.Function.Arguments),
 		})
 	}
-	return out, nil
+	usage := CompletionUsage{
+		PromptTokens:             resp.Usage.PromptTokens,
+		CompletionTokens:         resp.Usage.CompletionTokens,
+		CacheCreationInputTokens: resp.Usage.CacheCreationInputTokens,
+		CacheReadInputTokens:     resp.Usage.CacheReadInputTokens,
+	}
+	return out, usage, nil
 }
 
 func ParseAgentAnalysisResult(content string) (*AgentAnalysisResult, error) {

@@ -135,7 +135,7 @@ func (h *PoliciesHandler) create(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 		return
 	}
-	defer tx.Rollback(c.Request.Context())
+	defer func() { _ = tx.Rollback(c.Request.Context()) }()
 
 	var policyID uuid.UUID
 	err = tx.QueryRow(c.Request.Context(), `
@@ -197,7 +197,7 @@ func (h *PoliciesHandler) update(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 		return
 	}
-	defer tx.Rollback(c.Request.Context())
+	defer func() { _ = tx.Rollback(c.Request.Context()) }()
 
 	result, err := tx.Exec(c.Request.Context(), `
 		UPDATE policies

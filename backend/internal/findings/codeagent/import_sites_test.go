@@ -6,18 +6,18 @@ import (
 )
 
 func TestPrepareImportSitesForAgent_excludesLockfilesAndCaps(t *testing.T) {
-	raw := make([]string, 0, 30)
+	raw := make([]string, 0, MaxImportSites+8)
 	raw = append(raw, "poetry.lock", "pyproject.toml", "requirements.txt")
-	for i := 0; i < 30; i++ {
-		raw = append(raw, "app/module_"+string(rune('a'+i%26))+".py")
+	for i := 0; i < MaxImportSites+5; i++ {
+		raw = append(raw, strings.Join([]string{"app/module_", string(rune('a' + (i % 26))), "_", string(rune('0' + (i % 10))), ".py"}, ""))
 	}
 
 	prepared, total, omitted := PrepareImportSitesForAgent(raw)
-	if total != 33 {
-		t.Fatalf("expected total 33, got %d", total)
+	if total != MaxImportSites+8 {
+		t.Fatalf("expected total %d, got %d", MaxImportSites+8, total)
 	}
 	if omitted != 5 {
-		t.Fatalf("expected 5 omitted (30 app files capped to 25), got %d", omitted)
+		t.Fatalf("expected 5 omitted (%d app files capped to %d), got %d", MaxImportSites+5, MaxImportSites, omitted)
 	}
 	if len(prepared) != MaxImportSites {
 		t.Fatalf("expected %d prepared sites, got %d", MaxImportSites, len(prepared))

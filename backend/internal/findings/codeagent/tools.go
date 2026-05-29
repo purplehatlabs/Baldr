@@ -110,7 +110,7 @@ func (e *ToolExecutor) readFile(argsJSON json.RawMessage) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("open file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	start := 1
 	end := 1<<31 - 1

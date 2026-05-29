@@ -29,6 +29,7 @@ import {
   type ExploitabilityVerdict,
   type Finding,
   type FindingBulkAction,
+  type BulkFindingsResult,
   type FindingSortField,
   type FindingStatus,
   type ReachabilityStatus,
@@ -89,6 +90,7 @@ function useFindingFilterOptions() {
         { value: 'suppress' as const, label: t('findings.bulk.suppress') },
         { value: 'reopen' as const, label: t('findings.bulk.reopen') },
         { value: 'mark_fixed' as const, label: t('findings.bulk.markFixed') },
+        { value: 'reanalyze' as const, label: t('findings.bulk.reanalyze') },
         { value: 'assign' as const, label: t('findings.bulk.assign') },
       ],
       sortOptions: [
@@ -163,6 +165,7 @@ export default function FindingsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkAction, setBulkAction] = useState<FindingBulkAction>('suppress')
   const [assignTarget, setAssignTarget] = useState('')
+  const [bulkFeedback, setBulkFeedback] = useState<string | null>(null)
   const [newViewName, setNewViewName] = useState('')
   const [activeViewId, setActiveViewId] = useState('')
 
@@ -241,8 +244,9 @@ export default function FindingsPage() {
 
   const bulkMutation = useMutation({
     mutationFn: bulkUpdateFindings,
-    onSuccess: () => {
+    onSuccess: (result) => {
       setSelectedIds(new Set())
+      setBulkFeedback(buildBulkFeedbackMessage(result, t))
       queryClient.invalidateQueries({ queryKey: ['findings'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
@@ -352,6 +356,7 @@ export default function FindingsPage() {
   const runBulkAction = () => {
     const ids = Array.from(selectedIds)
     if (ids.length === 0) return
+    setBulkFeedback(null)
 
     const payload: {
       ids: string[]
@@ -762,6 +767,20 @@ export default function FindingsPage() {
             className="text-sm px-3 py-1.5 rounded-lg border border-brand-200 text-brand-700 hover:bg-white"
           >
             {t('findings.bulk.clearSelection')}
+          </button>
+        </div>
+      )}
+
+      {bulkFeedback && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          <span>{bulkFeedback}</span>
+          <button
+            type="button"
+            onClick={() => setBulkFeedback(null)}
+            className="text-blue-700 hover:text-blue-900"
+            title={t('common.close')}
+          >
+            <X className="h-4 w-4" />
           </button>
         </div>
       )}
@@ -1778,4 +1797,20 @@ function asSortOrder(value: unknown): SortOrder {
 function asPageSize(value: unknown): number {
   if (typeof value === 'number' && [10, 20, 50, 100].includes(value)) return value
   return 20
+}
+
+function buildBulkFeedbackMessage(
+  result: BulkFindingsResult,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string {
+  if (result.action !== 'reanalyze') {
+    return t('findings.bulk.resultDefault', { count: result.updated })
+  }
+
+  return t('findings.bulk.resultReanalyze', {
+    enqueued: result.reanalyze_enqueued ?? 0,
+    alreadyQueued: result.reanalyze_already_queued ?? 0,
+    skippedManual: result.reanalyze_skipped_manual ?? 0,
+    failed: result.reanalyze_failed ?? 0,
+  })
 }

@@ -158,7 +158,7 @@ func (s *TriageService) Reopen(ctx context.Context, findingID, tenantID, actorUs
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	now := time.Now().UTC()
 	source := models.TriageDecisionManual
@@ -219,7 +219,7 @@ func (s *TriageService) applyTriageStatus(
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	now := time.Now().UTC()
 	newFindingStatus := row.Status

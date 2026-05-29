@@ -3,22 +3,23 @@ package scanner
 import (
 	"testing"
 
-	osvmodels "github.com/google/osv-scanner/v2/pkg/models"
+	"github.com/ossf/osv-schema/bindings/go/osvschema"
 	internalmodels "github.com/purplehatlabs/Baldr/internal/models"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func TestClassifySeverity(t *testing.T) {
 	tests := []struct {
 		name      string
-		vuln      osvmodels.Vulnerability
+		vuln      *osvschema.Vulnerability
 		wantLevel internalmodels.Severity
 		wantHas   bool // whether a numeric score is returned
 	}{
 		{
 			name: "numeric CVSS v3 score 9.8 → critical",
-			vuln: osvmodels.Vulnerability{
-				Severity: []osvmodels.Severity{
-					{Type: osvmodels.SeverityCVSSV3, Score: "9.8"},
+			vuln: &osvschema.Vulnerability{
+				Severity: []*osvschema.Severity{
+					{Type: osvschema.Severity_CVSS_V3, Score: "9.8"},
 				},
 			},
 			wantLevel: internalmodels.SeverityCritical,
@@ -26,9 +27,9 @@ func TestClassifySeverity(t *testing.T) {
 		},
 		{
 			name: "CVSS v3.1 vector → score parsed",
-			vuln: osvmodels.Vulnerability{
-				Severity: []osvmodels.Severity{
-					{Type: osvmodels.SeverityCVSSV3, Score: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"},
+			vuln: &osvschema.Vulnerability{
+				Severity: []*osvschema.Severity{
+					{Type: osvschema.Severity_CVSS_V3, Score: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"},
 				},
 			},
 			wantLevel: internalmodels.SeverityCritical,
@@ -36,9 +37,9 @@ func TestClassifySeverity(t *testing.T) {
 		},
 		{
 			name: "CVSS v3.0 vector → score parsed",
-			vuln: osvmodels.Vulnerability{
-				Severity: []osvmodels.Severity{
-					{Type: osvmodels.SeverityCVSSV3, Score: "CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N"},
+			vuln: &osvschema.Vulnerability{
+				Severity: []*osvschema.Severity{
+					{Type: osvschema.Severity_CVSS_V3, Score: "CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N"},
 				},
 			},
 			wantLevel: internalmodels.SeverityMedium,
@@ -46,9 +47,9 @@ func TestClassifySeverity(t *testing.T) {
 		},
 		{
 			name: "CVSS v2 vector → score parsed",
-			vuln: osvmodels.Vulnerability{
-				Severity: []osvmodels.Severity{
-					{Type: osvmodels.SeverityCVSSV2, Score: "AV:N/AC:L/Au:N/C:P/I:P/A:P"},
+			vuln: &osvschema.Vulnerability{
+				Severity: []*osvschema.Severity{
+					{Type: osvschema.Severity_CVSS_V2, Score: "AV:N/AC:L/Au:N/C:P/I:P/A:P"},
 				},
 			},
 			wantLevel: internalmodels.SeverityHigh,
@@ -56,42 +57,42 @@ func TestClassifySeverity(t *testing.T) {
 		},
 		{
 			name: "no CVSS, GHSA textual HIGH",
-			vuln: osvmodels.Vulnerability{
-				DatabaseSpecific: map[string]interface{}{"severity": "HIGH"},
+			vuln: &osvschema.Vulnerability{
+				DatabaseSpecific: mustStruct(map[string]any{"severity": "HIGH"}),
 			},
 			wantLevel: internalmodels.SeverityHigh,
 			wantHas:   false,
 		},
 		{
 			name: "no CVSS, GHSA textual MODERATE → medium",
-			vuln: osvmodels.Vulnerability{
-				DatabaseSpecific: map[string]interface{}{"severity": "MODERATE"},
+			vuln: &osvschema.Vulnerability{
+				DatabaseSpecific: mustStruct(map[string]any{"severity": "MODERATE"}),
 			},
 			wantLevel: internalmodels.SeverityMedium,
 			wantHas:   false,
 		},
 		{
 			name: "CVSS overrides GHSA when both present",
-			vuln: osvmodels.Vulnerability{
-				Severity: []osvmodels.Severity{
-					{Type: osvmodels.SeverityCVSSV3, Score: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N"},
+			vuln: &osvschema.Vulnerability{
+				Severity: []*osvschema.Severity{
+					{Type: osvschema.Severity_CVSS_V3, Score: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N"},
 				},
-				DatabaseSpecific: map[string]interface{}{"severity": "LOW"},
+				DatabaseSpecific: mustStruct(map[string]any{"severity": "LOW"}),
 			},
 			wantLevel: internalmodels.SeverityMedium,
 			wantHas:   true,
 		},
 		{
 			name:      "empty vuln → unknown",
-			vuln:      osvmodels.Vulnerability{},
+			vuln:      &osvschema.Vulnerability{},
 			wantLevel: internalmodels.SeverityUnknown,
 			wantHas:   false,
 		},
 		{
 			name: "invalid CVSS vector, no fallback → unknown",
-			vuln: osvmodels.Vulnerability{
-				Severity: []osvmodels.Severity{
-					{Type: osvmodels.SeverityCVSSV3, Score: "not-a-vector"},
+			vuln: &osvschema.Vulnerability{
+				Severity: []*osvschema.Severity{
+					{Type: osvschema.Severity_CVSS_V3, Score: "not-a-vector"},
 				},
 			},
 			wantLevel: internalmodels.SeverityUnknown,
@@ -99,10 +100,10 @@ func TestClassifySeverity(t *testing.T) {
 		},
 		{
 			name: "highest score wins across multiple severity entries",
-			vuln: osvmodels.Vulnerability{
-				Severity: []osvmodels.Severity{
-					{Type: osvmodels.SeverityCVSSV2, Score: "AV:L/AC:H/Au:S/C:N/I:N/A:P"},
-					{Type: osvmodels.SeverityCVSSV3, Score: "9.8"},
+			vuln: &osvschema.Vulnerability{
+				Severity: []*osvschema.Severity{
+					{Type: osvschema.Severity_CVSS_V2, Score: "AV:L/AC:H/Au:S/C:N/I:N/A:P"},
+					{Type: osvschema.Severity_CVSS_V3, Score: "9.8"},
 				},
 			},
 			wantLevel: internalmodels.SeverityCritical,
@@ -124,4 +125,12 @@ func TestClassifySeverity(t *testing.T) {
 			}
 		})
 	}
+}
+
+func mustStruct(m map[string]any) *structpb.Struct {
+	s, err := structpb.NewStruct(m)
+	if err != nil {
+		panic(err)
+	}
+	return s
 }

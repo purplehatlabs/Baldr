@@ -169,3 +169,28 @@ Each cron job enqueues a `TaskScanRepo` for every non-archived repository in the
 - Installation Tokens generated on demand (expire in 1h, not persisted)
 - Git clone uses ephemeral token, masked in logs
 - `DEV_AUTH_ENABLED` disables mandatory Google OAuth **and** exposes an insecure endpoint — never `true` in production
+
+### LLM configuration and reliability
+
+**Per-tenant settings** (`tenant_llm_configs`):
+
+| Field | Purpose |
+|---|---|
+| `model` | Default model alias (LiteLLM `model_name`) |
+| `agentic_model` | Optional override for multi-turn code agent |
+| `translation_model` | Optional override for pt-BR translation |
+| `batch_enabled` | Prefer Batch API for scan-triggered translation |
+
+**Model source-of-truth:** versioned aliases in `litellm_config.yaml` (`model_list`). `STORE_MODEL_IN_DB=True` allows runtime DB overrides in LiteLLM, but Baldr validates required aliases at API startup.
+
+**Analysis dispatch modes** (`finding_analyses.llm_dispatch_mode`):
+
+- `realtime` — inline chat completions
+- `batch_pending` / `batch_done` — translation submitted via Batch API
+- `batch_fallback` — batch unavailable or agentic path (multi-turn + tools)
+
+**Scheduler leader election:** only one API replica holds `baldr:scheduler:leader` in Redis and runs gocron jobs.
+
+**Agent limits:** `MaxAgentTurns` / `MaxToolCalls` = 40, aligned with the system prompt.
+
+**Resilience:** centralized retry/backoff for 429/5xx on LLM HTTP calls; structured JSON finalization when free-form agent output fails to parse; prompt caching markers on stable system/bootstrap messages with usage logging.

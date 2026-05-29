@@ -76,7 +76,7 @@ func RegisterHandlers(
 		prioritization: findingsvc.NewPrioritizationService(db),
 	}
 	mux.HandleFunc(TaskScanRepo, h.Handle)
-	RegisterAnalysisHandlers(mux, db, ghClient, cfg, log)
+	RegisterAnalysisHandlers(mux, db, ghClient, cfg, enqueuer, log)
 	RegisterMetricsSnapshotHandlers(mux, db, log)
 	RegisterExceptionExpiryHandlers(mux, db, log)
 	RegisterThreatIntelHandlers(mux, db, log)
@@ -306,7 +306,7 @@ func (h *scanRepoHandler) runScan(
 	if err != nil {
 		return fmt.Errorf("clone: %w", err)
 	}
-	defer os.RemoveAll(cloneDir)
+	defer func() { _ = os.RemoveAll(cloneDir) }()
 
 	log.Info("cloned repo", zap.String("dir", cloneDir))
 

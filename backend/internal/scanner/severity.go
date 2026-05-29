@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	osvmodels "github.com/google/osv-scanner/v2/pkg/models"
+	"github.com/ossf/osv-schema/bindings/go/osvschema"
 	gocvss20 "github.com/pandatix/go-cvss/20"
 	gocvss30 "github.com/pandatix/go-cvss/30"
 	gocvss31 "github.com/pandatix/go-cvss/31"
@@ -28,11 +28,15 @@ import (
 // We try, in order: numeric score → CVSS vector parsing → GHSA textual fallback.
 // When multiple sources are available we keep the highest severity to err on
 // the side of caution.
-func classifySeverity(vuln osvmodels.Vulnerability) (internalmodels.Severity, *float64) {
+func classifySeverity(vuln *osvschema.Vulnerability) (internalmodels.Severity, *float64) {
+	if vuln == nil {
+		return internalmodels.SeverityUnknown, nil
+	}
+
 	bestSeverity := internalmodels.SeverityUnknown
 	var bestScore *float64
 
-	for _, sev := range vuln.Severity {
+	for _, sev := range vuln.GetSeverity() {
 		score, ok := extractScore(sev)
 		if !ok {
 			continue
@@ -48,7 +52,7 @@ func classifySeverity(vuln osvmodels.Vulnerability) (internalmodels.Severity, *f
 	}
 
 	if bestSeverity == internalmodels.SeverityUnknown {
-		if textual := severityFromDatabaseSpecific(vuln.DatabaseSpecific); textual != internalmodels.SeverityUnknown {
+		if textual := severityFromDatabaseSpecific(vuln.GetDatabaseSpecific()); textual != internalmodels.SeverityUnknown {
 			bestSeverity = textual
 		}
 	}
@@ -58,34 +62,35 @@ func classifySeverity(vuln osvmodels.Vulnerability) (internalmodels.Severity, *f
 
 // extractScore returns the CVSS base score for a single Severity entry,
 // regardless of whether Score holds a numeric value or a CVSS vector.
-func extractScore(sev osvmodels.Severity) (float64, bool) {
-	if sev.Score == "" {
+func extractScore(sev *osvschema.Severity) (float64, bool) {
+	if sev == nil || sev.GetScore() == "" {
 		return 0, false
 	}
 
-	if f, err := strconv.ParseFloat(strings.TrimSpace(sev.Score), 64); err == nil && f > 0 {
+	scoreText := sev.GetScore()
+	if f, err := strconv.ParseFloat(strings.TrimSpace(scoreText), 64); err == nil && f > 0 {
 		return f, true
 	}
 
-	switch sev.Type {
-	case osvmodels.SeverityCVSSV4:
-		if v, err := gocvss40.ParseVector(sev.Score); err == nil {
+	switch sev.GetType() {
+	case osvschema.Severity_CVSS_V4:
+		if v, err := gocvss40.ParseVector(scoreText); err == nil {
 			return v.Score(), true
 		}
-	case osvmodels.SeverityCVSSV3:
-		if strings.HasPrefix(sev.Score, "CVSS:3.1") {
-			if v, err := gocvss31.ParseVector(sev.Score); err == nil {
+	case osvschema.Severity_CVSS_V3:
+		if strings.HasPrefix(scoreText, "CVSS:3.1") {
+			if v, err := gocvss31.ParseVector(scoreText); err == nil {
 				return v.BaseScore(), true
 			}
 		}
-		if v, err := gocvss30.ParseVector(sev.Score); err == nil {
+		if v, err := gocvss30.ParseVector(scoreText); err == nil {
 			return v.BaseScore(), true
 		}
-		if v, err := gocvss31.ParseVector(sev.Score); err == nil {
+		if v, err := gocvss31.ParseVector(scoreText); err == nil {
 			return v.BaseScore(), true
 		}
-	case osvmodels.SeverityCVSSV2:
-		if v, err := gocvss20.ParseVector(sev.Score); err == nil {
+	case osvschema.Severity_CVSS_V2:
+		if v, err := gocvss20.ParseVector(scoreText); err == nil {
 			return v.BaseScore(), true
 		}
 	}
@@ -110,11 +115,11 @@ func scoreToSeverity(score float64) internalmodels.Severity {
 
 // severityFromDatabaseSpecific reads the GHSA-style textual severity stored in
 // the database_specific blob (used when no CVSS score is available).
-func severityFromDatabaseSpecific(ds map[string]interface{}) internalmodels.Severity {
+func severityFromDatabaseSpecific(ds interface{ AsMap() map[string]any }) internalmodels.Severity {
 	if ds == nil {
 		return internalmodels.SeverityUnknown
 	}
-	raw, ok := ds["severity"].(string)
+	raw, ok := ds.AsMap()["severity"].(string)
 	if !ok {
 		return internalmodels.SeverityUnknown
 	}

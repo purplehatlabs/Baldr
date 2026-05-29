@@ -29,6 +29,9 @@ frontend/coverage/
 # Docker
 .docker-data/
 
+# Local OSV scanner test output (not committed)
+osv-results*.json
+
 # OS
 .DS_Store
 Thumbs.db

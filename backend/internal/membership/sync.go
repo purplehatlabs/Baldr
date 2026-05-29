@@ -57,7 +57,7 @@ func (s *Service) SyncOrg(ctx context.Context, tenantID, orgID uuid.UUID) (*Sync
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	now := time.Now().UTC()
 	seen := make(map[int64]uuid.UUID, len(members))

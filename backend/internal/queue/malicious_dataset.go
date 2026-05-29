@@ -72,7 +72,7 @@ func (h *maliciousDatasetSyncHandler) Handle(ctx context.Context, task *asynq.Ta
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	upserted := 0
 	for _, item := range items {
@@ -182,7 +182,7 @@ func (h *maliciousDatasetSyncHandler) fetchDataset(ctx context.Context) ([]datas
 	if err != nil {
 		return nil, fmt.Errorf("request dataset: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("dataset endpoint status %d", resp.StatusCode)
@@ -227,7 +227,7 @@ func parseOSVZip(body []byte) ([]datasetIndicator, error) {
 			continue
 		}
 		rawFile, readErr := io.ReadAll(fileReader)
-		fileReader.Close()
+		_ = fileReader.Close()
 		if readErr != nil {
 			continue
 		}

@@ -159,7 +159,7 @@ func (h *threatIntelDailyHandler) fetchKEVSet(ctx context.Context) (map[string]s
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("KEV feed status %d", resp.StatusCode)
 	}
@@ -207,15 +207,15 @@ func (h *threatIntelDailyHandler) fetchEPSSBatch(ctx context.Context, cves []str
 			return nil, err
 		}
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			return nil, fmt.Errorf("EPSS API status %d", resp.StatusCode)
 		}
 		var payload epssResponse
 		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			return nil, err
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 
 		for _, item := range payload.Data {
 			normalized := normalizeCVE(item.CVE)

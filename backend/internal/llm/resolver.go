@@ -57,18 +57,27 @@ func (r *Resolver) Resolve(ctx context.Context, tenantID uuid.UUID) (Settings, e
 	var (
 		baseURL                 string
 		model                   string
+		defaultModel            string
+		agenticModel            *string
+		translationModel        *string
+		batchEnabled            bool
+		batchMode               string
 		apiKeyEncBytes          []byte
 		timeoutSeconds          int
 		autoAnalysisMinSeverity string
 	)
 	err := r.db.QueryRow(ctx, `
-		SELECT base_url, model, api_key_encrypted, timeout_seconds, auto_analysis_min_severity
+		SELECT base_url, model, COALESCE(default_model, model) AS default_model,
+		       agentic_model, translation_model, batch_enabled,
+		       COALESCE(batch_mode, 'realtime') AS batch_mode,
+		       api_key_encrypted, timeout_seconds, auto_analysis_min_severity
 		FROM tenant_llm_configs
 		WHERE tenant_id = $1`, tenantID,
-	).Scan(&baseURL, &model, &apiKeyEncBytes, &timeoutSeconds, &autoAnalysisMinSeverity)
+	).Scan(&baseURL, &model, &defaultModel, &agenticModel, &translationModel, &batchEnabled,
+		&batchMode, &apiKeyEncBytes, &timeoutSeconds, &autoAnalysisMinSeverity)
 
 	if errors.Is(err, pgx.ErrNoRows) {
-		if r.fallback.BaseURL == "" || r.fallback.Model == "" {
+		if r.fallback.BaseURL == "" || r.fallback.ResolveDefaultModel() == "" {
 			return Settings{}, fmt.Errorf("tenant %s has no LLM config and no fallback is set", tenantID)
 		}
 		return r.fallback, nil
@@ -91,13 +100,29 @@ func (r *Resolver) Resolve(ctx context.Context, tenantID uuid.UUID) (Settings, e
 		minSeverity = DefaultAutoAnalysisMinSeverity
 	}
 
+	resolvedDefaultModel := firstNonEmpty(defaultModel, model, r.fallback.ResolveDefaultModel())
+	resolvedAgenticModel := firstNonEmpty(derefString(agenticModel), r.fallback.AgenticModel, resolvedDefaultModel)
+	resolvedTranslationModel := firstNonEmpty(derefString(translationModel), r.fallback.TranslationModel, resolvedDefaultModel)
+
 	return Settings{
 		BaseURL:                 firstNonEmpty(baseURL, r.fallback.BaseURL),
 		APIKey:                  firstNonEmpty(apiKey, r.fallback.APIKey),
-		Model:                   firstNonEmpty(model, r.fallback.Model),
+		Model:                   firstNonEmpty(model, resolvedDefaultModel),
+		DefaultModel:            resolvedDefaultModel,
+		AgenticModel:            resolvedAgenticModel,
+		TranslationModel:        resolvedTranslationModel,
+		BatchEnabled:            batchEnabled || r.fallback.BatchEnabled,
+		BatchMode:               firstNonEmpty(batchMode, r.fallback.BatchMode, "realtime"),
 		TimeoutSeconds:          firstPositive(timeoutSeconds, r.fallback.TimeoutSeconds),
 		AutoAnalysisMinSeverity: minSeverity,
 	}, nil
+}
+
+func derefString(v *string) string {
+	if v == nil {
+		return ""
+	}
+	return *v
 }
 
 func firstNonEmpty(values ...string) string {

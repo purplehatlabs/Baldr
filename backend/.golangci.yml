@@ -1,0 +1,23 @@
+version: "2"
+
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+  issues-exit-code: 1
+
+severity:
+  default: error
+
+linters:
+  default: standard
+  enable:
+    - gosec
+  settings:
+    gosec:
+      excludes:
+        - G104
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - gosec

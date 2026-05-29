@@ -1,0 +1,174 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint-go:
+    name: golangci-lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Install golangci-lint
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
+            sh -s -- -b "$(go env GOPATH)/bin" v2.11.4
+
+      - name: golangci-lint
+        run: |
+          golangci-lint run ./... \
+            --output.json.path=golangci-report.json \
+            --output.text.path=stdout || true
+          count="$(jq '.Issues | length' golangci-report.json)"
+          if [ "$count" -gt 0 ]; then
+            echo "golangci-lint reported $count issue(s)."
+            exit 1
+          fi
+
+  lint-frontend:
+    name: ESLint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: ESLint
+        run: npm run lint
+
+  govulncheck:
+    name: govulncheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Run govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  osv-scanner:
+    name: OSV-Scanner
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan lockfiles
+        uses: google/osv-scanner-action/osv-scanner-action@v2
+        with:
+          scan-args: |-
+            --lockfile=backend/go.mod
+            --lockfile=frontend/package-lock.json
+            --format=json
+            --output=osv-results.json
+
+      - name: Fail on HIGH or CRITICAL
+        run: bash .github/scripts/check-osv-high-critical.sh osv-results.json
+
+  gitleaks:
+    name: Gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  license-check:
+    name: License compliance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install go-licenses
+        run: go install github.com/google/go-licenses/v2@latest
+
+      - name: Check Go dependency licenses
+        working-directory: backend
+        run: |
+          go-licenses check ./... \
+            --allowed_licenses=Apache-2.0,MIT,BSD-3-Clause,BSD-2-Clause,ISC,MPL-2.0,0BSD,CC0-1.0,Zlib,Unicode-3.0,Unlicense \
+            --ignore github.com/purplehatlabs/Baldr \
+            --ignore github.com/spdx/tools-golang \
+            --ignore github.com/deitch/magic/pkg/magic \
+            --ignore github.com/deitch/magic/pkg/magic/internal \
+            --ignore github.com/deitch/magic/pkg/magic/parser
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Check npm dependency licenses
+        working-directory: frontend
+        run: |
+          npm exec --yes --package=license-checker -- license-checker \
+            --production \
+            --excludePrivatePackages \
+            --onlyAllow "MIT;ISC;BSD-3-Clause;Apache-2.0;MIT AND ISC;0BSD;CC0-1.0"
+
+  semgrep:
+    name: Semgrep
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Semgrep (Go + TypeScript)
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/ci
+            p/golang
+            p/typescript

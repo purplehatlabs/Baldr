@@ -1,5 +1,8 @@
 # Baldr
 
+[![CI](https://github.com/purplehatlabs/Baldr/actions/workflows/ci.yml/badge.svg)](https://github.com/purplehatlabs/Baldr/actions/workflows/ci.yml)
+[![Security](https://github.com/purplehatlabs/Baldr/actions/workflows/security.yml/badge.svg)](https://github.com/purplehatlabs/Baldr/actions/workflows/security.yml)
+
 > *In Norse mythology, Baldr was slain by a single overlooked dependency — a mistletoe Frigg forgot to make harmless. Baldr the platform finds those dependencies before they find you.*
 
 Open-source Software Composition Analysis (SCA) platform. Baldr automatically scans your GitHub organization's repositories for vulnerable and malicious dependencies, maps each finding to the responsible team via CODEOWNERS, and uses LLM analysis to help triage what actually matters.

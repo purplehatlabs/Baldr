@@ -8,9 +8,9 @@ import (
 )
 
 const (
-	MaxAgentTurns    = 40
-	MaxToolCalls     = 40
-	MaxImportSites   = 25
+	MaxAgentTurns    = 150
+	MaxToolCalls     = 150
+	MaxImportSites   = 50
 	DefaultMaxOutput = 8000
 )
 

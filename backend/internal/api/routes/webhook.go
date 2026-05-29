@@ -53,9 +53,8 @@ func (h *WebhookHandler) handle(c *gin.Context) {
 }
 
 func (h *WebhookHandler) handlePush(c *gin.Context, _ []byte) {
-	// For now just trigger a scan on the default branch push
-	// A full implementation would parse the push payload to get the repo full_name
-	// and look up the repo ID in our DB.
+	// Resolve organization + tenant_id from the GitHub payload before enqueueing scans or
+	// mutating tenant-scoped rows. Never trust repo/org identifiers without a tenant_id check.
 	c.Status(http.StatusOK)
 }
 

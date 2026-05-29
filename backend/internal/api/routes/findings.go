@@ -176,7 +176,7 @@ func (h *FindingsHandler) resolveUserLocale(ctx context.Context, c *gin.Context)
 	err := h.db.QueryRow(ctx, `
 		SELECT COALESCE(NULLIF(language, ''), 'en')
 		FROM users
-		WHERE id = $1 AND tenant_id = $2`, claims.UserID, claims.TenantID,
+		WHERE id = $1`, claims.UserID,
 	).Scan(&language)
 	if err != nil {
 		return i18n.DefaultLocale
@@ -638,7 +638,7 @@ func (h *FindingsHandler) topRisks(c *gin.Context) {
 
 func (h *FindingsHandler) createManual(c *gin.Context) {
 	claims := middleware.ClaimsFrom(c)
-	if claims.Role != string(models.RoleAdmin) && claims.Role != string(models.RoleOwner) {
+	if !middleware.HasRole(claims.Role, models.RoleOwner, models.RoleAdmin) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "admin or owner role required"})
 		return
 	}

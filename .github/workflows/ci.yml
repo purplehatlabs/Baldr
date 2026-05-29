@@ -25,6 +25,21 @@ jobs:
       run:
         working-directory: backend
 
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: devsecops
+          POSTGRES_PASSWORD: devsecops
+          POSTGRES_DB: devsecops
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U devsecops -d devsecops"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -39,6 +54,11 @@ jobs:
 
       - name: Test
         run: go test ./...
+
+      - name: Integration tests
+        env:
+          TEST_DATABASE_URL: postgres://devsecops:devsecops@localhost:5432/devsecops?sslmode=disable
+        run: go test -tags integration -count=1 ./internal/api/routes/...
 
       - name: Vet
         run: go vet ./...

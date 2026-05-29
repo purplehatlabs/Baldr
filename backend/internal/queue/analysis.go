@@ -57,6 +57,7 @@ func (e *Enqueuer) EnqueueFindingAnalysis(analysisID, findingID, tenantID uuid.U
 
 type validateFindingHandler struct {
 	svc *findingsvc.Service
+	db  *pgxpool.Pool
 	log *zap.Logger
 }
 
@@ -70,7 +71,7 @@ func RegisterAnalysisHandlers(
 ) {
 	svc := findingsvc.NewService(db, cfg, ghClient, log)
 	svc.SetBatchPollEnqueuer(enqueuer.EnqueueBatchTranslationPoll)
-	h := &validateFindingHandler{svc: svc, log: log}
+	h := &validateFindingHandler{svc: svc, db: db, log: log}
 	mux.HandleFunc(TaskValidateFinding, h.Handle)
 
 	batchHandler := &batchTranslationPollHandler{svc: svc, enqueuer: enqueuer, log: log}
@@ -87,10 +88,22 @@ func (h *validateFindingHandler) Handle(ctx context.Context, t *asynq.Task) erro
 	if err != nil {
 		return fmt.Errorf("parse analysis_id: %w", err)
 	}
+	findingID, err := uuid.Parse(payload.FindingID)
+	if err != nil {
+		return fmt.Errorf("parse finding_id: %w", err)
+	}
+	tenantID, err := uuid.Parse(payload.TenantID)
+	if err != nil {
+		return fmt.Errorf("parse tenant_id: %w", err)
+	}
+	if err := validateFindingTenant(ctx, h.db, findingID, tenantID); err != nil {
+		return err
+	}
 
 	log := h.log.With(
 		zap.String("analysis_id", payload.AnalysisID),
 		zap.String("finding_id", payload.FindingID),
+		zap.String("tenant_id", payload.TenantID),
 	)
 	log.Info("starting finding analysis")
 

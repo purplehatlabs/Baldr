@@ -122,8 +122,10 @@ func TestMain(m *testing.M) {
 Run:
 ```bash
 TEST_DATABASE_URL=postgres://devsecops:devsecops@localhost:5432/devsecops?sslmode=disable \
-go test -tags integration -count=1 ./...
+go test -tags integration -count=1 ./internal/api/routes/...
 ```
+
+When `TEST_DATABASE_URL` is unset, integration tests are skipped automatically (`t.Skip`).
 
 ## Frontend — unit tests
 

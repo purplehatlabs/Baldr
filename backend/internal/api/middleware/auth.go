@@ -9,11 +9,12 @@ import (
 )
 
 const (
-	ContextKeyUser     = "user_claims"
-	cookieName         = "access_token"
+	ContextKeyUser = "user_claims"
+	cookieName     = "access_token"
 )
 
-func Auth(tokens *auth.TokenService) gin.HandlerFunc {
+// Auth validates JWT and active membership token_version (rejects stale sessions).
+func Auth(tokens *auth.TokenService, memberships *auth.MembershipStore) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenStr := extractToken(c)
 		if tokenStr == "" {
@@ -27,17 +28,20 @@ func Auth(tokens *auth.TokenService) gin.HandlerFunc {
 			return
 		}
 
+		if err := memberships.ValidateSession(c.Request.Context(), claims.TenantID, claims.UserID, claims.TokenVersion); err != nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "session expired"})
+			return
+		}
+
 		c.Set(ContextKeyUser, claims)
 		c.Next()
 	}
 }
 
 func extractToken(c *gin.Context) string {
-	// 1. httpOnly cookie
 	if cookie, err := c.Cookie(cookieName); err == nil && cookie != "" {
 		return cookie
 	}
-	// 2. Authorization: Bearer <token> header (for API clients)
 	header := c.GetHeader("Authorization")
 	if strings.HasPrefix(header, "Bearer ") {
 		return strings.TrimPrefix(header, "Bearer ")

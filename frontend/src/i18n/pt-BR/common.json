@@ -20,7 +20,10 @@
     "defaultTitle": "DevSecOps"
   },
   "header": {
-    "logout": "Sair"
+    "logout": "Sair",
+    "tenantSwitcher": {
+      "label": "Trocar workspace"
+    }
   },
   "login": {
     "tagline": "Análise de vulnerabilidades de dependências para toda a organização",
@@ -43,6 +46,11 @@
       "database": "Base de dados"
     }
   },
+  "invite": {
+    "invalidLink": "Link de convite inválido.",
+    "acceptSuccess": "Convite aceito. Redirecionando…",
+    "acceptFailed": "Não foi possível aceitar o convite."
+  },
   "settings": {
     "language": {
       "title": "Idioma",
@@ -52,6 +60,29 @@
       "ptBR": "Português (Brasil)",
       "saved": "Idioma atualizado.",
       "saveError": "Não foi possível atualizar o idioma."
+    },
+    "members": {
+      "title": "Membros do workspace",
+      "description": "Gerencie papéis e convites deste workspace. Alterações entram em vigor imediatamente e encerram a sessão dos usuários afetados.",
+      "listTitle": "Membros",
+      "empty": "Nenhum membro encontrado.",
+      "roleLabel": "Papel",
+      "statusLabel": "Status",
+      "roleMember": "Membro",
+      "roleAdmin": "Admin",
+      "roleOwner": "Owner",
+      "statusActive": "Ativo",
+      "statusInactive": "Inativo",
+      "inviteTitle": "Convidar por e-mail",
+      "inviteDescription": "Envie um link de convite para adicionar alguém a este workspace. A pessoa deve entrar com o e-mail convidado para aceitar.",
+      "inviteEmailPlaceholder": "colega@empresa.com",
+      "sendInvite": "Enviar convite",
+      "inviting": "Enviando…",
+      "inviteFailed": "Não foi possível criar o convite.",
+      "inviteExpires": "Expira em {{value}}",
+      "copyInviteLink": "Copiar link do convite",
+      "copied": "Copiado",
+      "revokeInvite": "Revogar convite"
     },
     "orgs": {
       "title": "Organizações GitHub",

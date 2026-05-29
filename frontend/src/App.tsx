@@ -14,6 +14,7 @@ import RepositoriesPage from '@/pages/Repositories'
 import ScansPage from '@/pages/Scans'
 import SupplyChainSignalsPage from '@/pages/SupplyChainSignals'
 import ManualVulnerabilitiesPage from '@/pages/ManualVulnerabilities'
+import AcceptInvitePage from '@/pages/AcceptInvite'
 import { buildLoginPath, popPostLoginRedirect } from '@/lib/postLoginRedirect'
 
 function FindingsRedirect() {
@@ -51,6 +52,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/invite/:token" element={<AcceptInvitePage />} />
         <Route element={<ProtectedRoutes />}>
           <Route path="/" element={<HomeRedirect />} />
           <Route path="/overview" element={<OverviewPage />} />

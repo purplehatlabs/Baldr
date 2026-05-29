@@ -34,22 +34,12 @@ func NewSettingsHandler(db *pgxpool.Pool, encKey []byte, log *zap.Logger) *Setti
 func (h *SettingsHandler) Register(r gin.IRouter, authMW gin.HandlerFunc) {
 	g := r.Group("/api/v1/settings", authMW)
 	g.GET("/github-app", h.getGitHubApp)
-	g.PUT("/github-app", h.requireAdmin, h.putGitHubApp)
-	g.DELETE("/github-app", h.requireAdmin, h.deleteGitHubApp)
+	g.PUT("/github-app", middleware.RequireAdmin(), h.putGitHubApp)
+	g.DELETE("/github-app", middleware.RequireAdmin(), h.deleteGitHubApp)
 
 	g.GET("/llm", h.getLLM)
-	g.PUT("/llm", h.requireAdmin, h.putLLM)
-	g.DELETE("/llm", h.requireAdmin, h.deleteLLM)
-}
-
-// requireAdmin gates write endpoints to owner/admin roles.
-func (h *SettingsHandler) requireAdmin(c *gin.Context) {
-	claims := middleware.ClaimsFrom(c)
-	if claims == nil || (claims.Role != "owner" && claims.Role != "admin") {
-		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "owner or admin role required"})
-		return
-	}
-	c.Next()
+	g.PUT("/llm", middleware.RequireAdmin(), h.putLLM)
+	g.DELETE("/llm", middleware.RequireAdmin(), h.deleteLLM)
 }
 
 type githubAppStatusResponse struct {

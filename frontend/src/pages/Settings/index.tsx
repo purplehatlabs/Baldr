@@ -12,7 +12,12 @@ import {
   KeyRound,
   Sparkles,
   RefreshCw,
+  Users,
+  Mail,
+  Copy,
+  X,
 } from 'lucide-react'
+import { formatDateTime } from '@/lib/locale'
 import {
   listOrgs,
   createOrg,
@@ -36,16 +41,260 @@ import { useAuth } from '@/hooks/useAuth'
 import { useLanguage } from '@/hooks/useLanguage'
 import { SUPPORTED_LOCALES, type AppLocale } from '@/i18n/languages'
 import { getAppLocale } from '@/i18n'
-import { formatDateTime } from '@/lib/locale'
+import {
+  listMembers,
+  updateMember,
+  type TenantMember,
+  type MembershipStatus,
+} from '@/api/members'
+import {
+  listInvites,
+  createInvite,
+  revokeInvite,
+  type TenantInvite,
+} from '@/api/invites'
+import type { UserRole } from '@/api/auth'
 
 export default function SettingsPage() {
   return (
     <div className="max-w-3xl space-y-10">
       <LanguageSection />
+      <MembersSection />
       <GithubAppSection />
       <LLMConfigSection />
       <OrgsSection />
     </div>
+  )
+}
+
+function MembersSection() {
+  const { t } = useTranslation()
+  const { user } = useAuth()
+  const queryClient = useQueryClient()
+  const canManage = user?.role === 'admin' || user?.role === 'owner'
+
+  const { data: members = [], isLoading: membersLoading } = useQuery({
+    queryKey: ['members'],
+    queryFn: listMembers,
+    enabled: canManage,
+  })
+
+  const { data: invites = [], isLoading: invitesLoading } = useQuery({
+    queryKey: ['invites'],
+    queryFn: listInvites,
+    enabled: canManage,
+  })
+
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState<UserRole>('member')
+  const [inviteError, setInviteError] = useState('')
+  const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null)
+
+  const updateMemberMutation = useMutation({
+    mutationFn: ({ id, role, status }: { id: string; role?: UserRole; status?: MembershipStatus }) =>
+      updateMember(id, { role, status }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['members'] }),
+  })
+
+  const createInviteMutation = useMutation({
+    mutationFn: () => createInvite({ email: inviteEmail.trim(), role: inviteRole }),
+    onSuccess: () => {
+      setInviteEmail('')
+      setInviteError('')
+      queryClient.invalidateQueries({ queryKey: ['invites'] })
+    },
+    onError: () => setInviteError(t('settings.members.inviteFailed')),
+  })
+
+  const revokeInviteMutation = useMutation({
+    mutationFn: revokeInvite,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['invites'] }),
+  })
+
+  if (!canManage) {
+    return null
+  }
+
+  if (membersLoading || invitesLoading) {
+    return <PageSpinner />
+  }
+
+  const copyInviteLink = async (invite: TenantInvite) => {
+    if (!invite.invite_url) return
+    await navigator.clipboard.writeText(invite.invite_url)
+    setCopiedInviteId(invite.id)
+    setTimeout(() => setCopiedInviteId(null), 2000)
+  }
+
+  return (
+    <section className="space-y-6">
+      <div>
+        <h2 className="font-semibold text-gray-900">{t('settings.members.title')}</h2>
+        <p className="text-sm text-gray-500 mt-0.5">{t('settings.members.description')}</p>
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
+          <h3 className="text-sm font-medium text-gray-900">{t('settings.members.listTitle')}</h3>
+        </div>
+        {members.length === 0 ? (
+          <p className="px-5 py-8 text-sm text-gray-500 text-center">{t('settings.members.empty')}</p>
+        ) : (
+          <ul className="divide-y divide-gray-100">
+            {members.map((member) => (
+              <MemberRow
+                key={member.membership_id}
+                member={member}
+                currentUserId={user?.id}
+                onUpdate={(input) =>
+                  updateMemberMutation.mutate({ id: member.membership_id, ...input })
+                }
+                updating={
+                  updateMemberMutation.isPending &&
+                  updateMemberMutation.variables?.id === member.membership_id
+                }
+              />
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
+        <div>
+          <h3 className="text-sm font-medium text-gray-900 flex items-center gap-2">
+            <Mail className="w-4 h-4 text-gray-500" /> {t('settings.members.inviteTitle')}
+          </h3>
+          <p className="text-xs text-gray-500 mt-1">{t('settings.members.inviteDescription')}</p>
+        </div>
+        <form
+          className="grid grid-cols-1 sm:grid-cols-3 gap-3"
+          onSubmit={(e) => {
+            e.preventDefault()
+            setInviteError('')
+            createInviteMutation.mutate()
+          }}
+        >
+          <input
+            type="email"
+            value={inviteEmail}
+            onChange={(e) => setInviteEmail(e.target.value)}
+            placeholder={t('settings.members.inviteEmailPlaceholder')}
+            required
+            className="sm:col-span-2 text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+          />
+          <select
+            value={inviteRole}
+            onChange={(e) => setInviteRole(e.target.value as UserRole)}
+            className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+          >
+            <option value="member">{t('settings.members.roleMember')}</option>
+            <option value="admin">{t('settings.members.roleAdmin')}</option>
+            <option value="owner">{t('settings.members.roleOwner')}</option>
+          </select>
+          <div className="sm:col-span-3 flex justify-end">
+            <button
+              type="submit"
+              disabled={createInviteMutation.isPending || !inviteEmail.trim()}
+              className="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 transition-colors disabled:opacity-50"
+            >
+              {createInviteMutation.isPending
+                ? t('settings.members.inviting')
+                : t('settings.members.sendInvite')}
+            </button>
+          </div>
+        </form>
+        {inviteError && (
+          <p className="text-xs text-red-600 flex items-center gap-1">
+            <AlertCircle className="w-3.5 h-3.5" /> {inviteError}
+          </p>
+        )}
+
+        {invites.length > 0 && (
+          <ul className="divide-y divide-gray-100 border border-gray-100 rounded-lg">
+            {invites.map((invite) => (
+              <li key={invite.id} className="flex items-center gap-3 px-4 py-3 text-sm">
+                <Users className="w-4 h-4 text-gray-400 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-gray-900 truncate">{invite.email}</p>
+                  <p className="text-xs text-gray-500">
+                    {t('settings.members.inviteExpires', {
+                      value: formatDateTime(invite.expires_at, getAppLocale()),
+                    })}
+                  </p>
+                </div>
+                {invite.invite_url && (
+                  <button
+                    type="button"
+                    onClick={() => copyInviteLink(invite)}
+                    className="p-2 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50"
+                    title={t('settings.members.copyInviteLink')}
+                  >
+                    <Copy className="w-4 h-4" />
+                  </button>
+                )}
+                {copiedInviteId === invite.id && (
+                  <span className="text-xs text-green-600">{t('settings.members.copied')}</span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => revokeInviteMutation.mutate(invite.id)}
+                  disabled={revokeInviteMutation.isPending}
+                  className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
+                  title={t('settings.members.revokeInvite')}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function MemberRow({
+  member,
+  currentUserId,
+  onUpdate,
+  updating,
+}: {
+  member: TenantMember
+  currentUserId?: string
+  onUpdate: (input: { role?: UserRole; status?: MembershipStatus }) => void
+  updating: boolean
+}) {
+  const { t } = useTranslation()
+  const isSelf = member.user_id === currentUserId
+
+  return (
+    <li className="flex flex-wrap items-center gap-3 px-5 py-4">
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-gray-900">{member.name || member.email}</p>
+        <p className="text-xs text-gray-500 truncate">{member.email}</p>
+      </div>
+      <select
+        value={member.role}
+        disabled={updating || isSelf}
+        onChange={(e) => onUpdate({ role: e.target.value as UserRole })}
+        className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white disabled:opacity-50"
+        aria-label={t('settings.members.roleLabel')}
+      >
+        <option value="member">{t('settings.members.roleMember')}</option>
+        <option value="admin">{t('settings.members.roleAdmin')}</option>
+        <option value="owner">{t('settings.members.roleOwner')}</option>
+      </select>
+      <select
+        value={member.status}
+        disabled={updating || isSelf}
+        onChange={(e) => onUpdate({ status: e.target.value as MembershipStatus })}
+        className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white disabled:opacity-50"
+        aria-label={t('settings.members.statusLabel')}
+      >
+        <option value="active">{t('settings.members.statusActive')}</option>
+        <option value="inactive">{t('settings.members.statusInactive')}</option>
+      </select>
+    </li>
   )
 }
 

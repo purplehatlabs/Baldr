@@ -36,6 +36,57 @@ type User struct {
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 }
 
+type MembershipStatus string
+
+const (
+	MembershipActive   MembershipStatus = "active"
+	MembershipInactive MembershipStatus = "inactive"
+)
+
+type TenantMembership struct {
+	ID           uuid.UUID        `json:"id" db:"id"`
+	TenantID     uuid.UUID        `json:"tenant_id" db:"tenant_id"`
+	UserID       uuid.UUID        `json:"user_id" db:"user_id"`
+	Role         UserRole         `json:"role" db:"role"`
+	Status       MembershipStatus `json:"status" db:"status"`
+	TokenVersion int              `json:"token_version" db:"token_version"`
+	CreatedAt    time.Time        `json:"created_at" db:"created_at"`
+	UpdatedAt    time.Time        `json:"updated_at" db:"updated_at"`
+}
+
+type InviteStatus string
+
+const (
+	InvitePending  InviteStatus = "pending"
+	InviteAccepted InviteStatus = "accepted"
+	InviteRevoked  InviteStatus = "revoked"
+	InviteExpired  InviteStatus = "expired"
+)
+
+type TenantInvite struct {
+	ID         uuid.UUID    `json:"id" db:"id"`
+	TenantID   uuid.UUID    `json:"tenant_id" db:"tenant_id"`
+	Email      string       `json:"email" db:"email"`
+	Role       UserRole     `json:"role" db:"role"`
+	Token      string       `json:"token" db:"token"`
+	InvitedBy  uuid.UUID    `json:"invited_by" db:"invited_by"`
+	Status     InviteStatus `json:"status" db:"status"`
+	ExpiresAt  time.Time    `json:"expires_at" db:"expires_at"`
+	CreatedAt  time.Time    `json:"created_at" db:"created_at"`
+	AcceptedAt *time.Time   `json:"accepted_at,omitempty" db:"accepted_at"`
+	AcceptedBy *uuid.UUID   `json:"accepted_by,omitempty" db:"accepted_by"`
+}
+
+// TenantSummary is returned by auth tenant listing endpoints.
+type TenantSummary struct {
+	TenantID   uuid.UUID `json:"tenant_id"`
+	TenantName string    `json:"tenant_name"`
+	TenantSlug string    `json:"tenant_slug"`
+	Role       UserRole  `json:"role"`
+	Status     MembershipStatus `json:"status"`
+	IsActive   bool      `json:"is_active"`
+}
+
 // TenantGitHubAppConfig stores the per-tenant GitHub App credentials.
 // The private key is AES-GCM encrypted; never expose it through the API.
 type TenantGitHubAppConfig struct {

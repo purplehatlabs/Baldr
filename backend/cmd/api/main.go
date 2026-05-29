@@ -79,6 +79,8 @@ func main() {
 	defer sched.Close()
 
 	tokens := auth.NewTokenService(cfg.JWTSecret)
+	memberships := auth.NewMembershipStore(pool)
+	authMW := middleware.Auth(tokens, memberships)
 
 	var googleProvider *auth.GoogleProvider
 	if cfg.GoogleSSOEnabled && cfg.GoogleClientID != "" {
@@ -88,8 +90,6 @@ func main() {
 	if cfg.GitHubSSOEnabled && cfg.GitHubClientID != "" {
 		githubProvider = auth.NewGitHubProvider(cfg.GitHubClientID, cfg.GitHubClientSecret, cfg.GitHubRedirectURL)
 	}
-
-	authMW := middleware.Auth(tokens)
 
 	r := gin.New()
 	if cfg.DevAuthEnabled {
@@ -118,6 +118,13 @@ func main() {
 	})
 	authHandler.Register(r)
 	authHandler.RegisterProtected(r, authMW)
+	routes.NewMembersHandler(pool, log).Register(r, authMW)
+	routes.NewInvitesHandler(routes.AuthHandlerConfig{
+		Tokens:          tokens,
+		DB:              pool,
+		Log:             log,
+		FrontendBaseURL: cfg.FrontendBaseURL,
+	}).Register(r, authMW)
 
 	if cfg.DevAuthEnabled {
 		routes.NewDevAuthHandler(tokens, pool, log).Register(r)

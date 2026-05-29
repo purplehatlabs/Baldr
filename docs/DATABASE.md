@@ -11,16 +11,41 @@ tenants
 
 users
   id              uuid PK
-  tenant_id       uuid FK→tenants       ← ALWAYS filter by this field
-  email           varchar UNIQUE
+  tenant_id       uuid FK→tenants       ← **deprecated:** legacy default tenant; use tenant_memberships
+  email           varchar             ← globally unique (lower(email) index)
   google_id       varchar UNIQUE NULL   ← NULL for GitHub-only users; "dev:<uuid>" for dev
   github_user_id  bigint UNIQUE NULL
   github_login    varchar NULL
   auth_provider   varchar NOT NULL DEFAULT 'google'  ← google|github|dev
   name            varchar
   avatar_url      text
-  role            enum(owner,admin,member)
+  role            enum(owner,admin,member)  ← **deprecated:** use tenant_memberships.role
+  language        varchar
   created_at      timestamptz
+
+tenant_memberships              ← RBAC: user access per tenant
+  id              uuid PK
+  tenant_id       uuid FK→tenants
+  user_id         uuid FK→users
+  role            enum(owner,admin,member)
+  status          enum(active,inactive)
+  token_version   int NOT NULL DEFAULT 1   ← bumped on role/status change; validated in JWT
+  created_at      timestamptz
+  updated_at      timestamptz
+  UNIQUE(tenant_id, user_id)
+
+tenant_invites                  ← email invite to join a workspace
+  id              uuid PK
+  tenant_id       uuid FK→tenants
+  email           varchar
+  role            enum(owner,admin,member)
+  token           varchar UNIQUE
+  invited_by      uuid FK→users
+  status          enum(pending,accepted,revoked,expired)
+  expires_at      timestamptz
+  created_at      timestamptz
+  accepted_at     timestamptz NULL
+  accepted_by     uuid FK→users NULL
 
 org_members                         ← snapshot of GitHub org members per org
   id              uuid PK
@@ -176,7 +201,10 @@ GROUP BY t.id;
 All indexes follow the pattern `idx_<table>_<column>`:
 
 ```sql
+idx_users_email_lower
 idx_users_tenant_id
+idx_tenant_memberships_user_id
+idx_tenant_memberships_tenant_id
 idx_users_google_id
 idx_users_github_user_id
 idx_users_github_login

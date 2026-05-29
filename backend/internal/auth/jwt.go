@@ -11,10 +11,11 @@ import (
 const tokenTTL = 24 * time.Hour
 
 type Claims struct {
-	UserID   uuid.UUID `json:"user_id"`
-	TenantID uuid.UUID `json:"tenant_id"`
-	Email    string    `json:"email"`
-	Role     string    `json:"role"`
+	UserID       uuid.UUID `json:"user_id"`
+	TenantID     uuid.UUID `json:"tenant_id"`
+	Email        string    `json:"email"`
+	Role         string    `json:"role"`
+	TokenVersion int       `json:"token_version"`
 	jwt.RegisteredClaims
 }
 
@@ -26,12 +27,13 @@ func NewTokenService(secret string) *TokenService {
 	return &TokenService{secret: []byte(secret)}
 }
 
-func (s *TokenService) Issue(userID, tenantID uuid.UUID, email, role string) (string, error) {
+func (s *TokenService) Issue(userID, tenantID uuid.UUID, email, role string, tokenVersion int) (string, error) {
 	claims := Claims{
-		UserID:   userID,
-		TenantID: tenantID,
-		Email:    email,
-		Role:     role,
+		UserID:       userID,
+		TenantID:     tenantID,
+		Email:        email,
+		Role:         role,
+		TokenVersion: tokenVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(tokenTTL)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

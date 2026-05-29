@@ -20,7 +20,10 @@
     "defaultTitle": "DevSecOps"
   },
   "header": {
-    "logout": "Sign out"
+    "logout": "Sign out",
+    "tenantSwitcher": {
+      "label": "Switch workspace"
+    }
   },
   "login": {
     "tagline": "Dependency vulnerability analysis for your entire organization",
@@ -43,6 +46,11 @@
       "database": "Database"
     }
   },
+  "invite": {
+    "invalidLink": "Invalid invite link.",
+    "acceptSuccess": "Invite accepted. Redirecting…",
+    "acceptFailed": "Could not accept invite."
+  },
   "settings": {
     "language": {
       "title": "Language",
@@ -52,6 +60,29 @@
       "ptBR": "Portuguese (Brazil)",
       "saved": "Language updated.",
       "saveError": "Could not update language."
+    },
+    "members": {
+      "title": "Workspace members",
+      "description": "Manage roles and invitations for this workspace. Changes take effect immediately and sign out affected users.",
+      "listTitle": "Members",
+      "empty": "No members found.",
+      "roleLabel": "Role",
+      "statusLabel": "Status",
+      "roleMember": "Member",
+      "roleAdmin": "Admin",
+      "roleOwner": "Owner",
+      "statusActive": "Active",
+      "statusInactive": "Inactive",
+      "inviteTitle": "Invite by email",
+      "inviteDescription": "Send an invite link to add someone to this workspace. They must sign in with the invited email to accept.",
+      "inviteEmailPlaceholder": "colleague@company.com",
+      "sendInvite": "Send invite",
+      "inviting": "Sending…",
+      "inviteFailed": "Could not create invite.",
+      "inviteExpires": "Expires {{value}}",
+      "copyInviteLink": "Copy invite link",
+      "copied": "Copied",
+      "revokeInvite": "Revoke invite"
     },
     "orgs": {
       "title": "GitHub Organizations",

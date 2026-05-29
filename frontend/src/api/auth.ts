@@ -3,15 +3,37 @@ import { normalizeLocale, type AppLocale } from '@/i18n/languages'
 
 export type AppLanguage = AppLocale
 
+export type UserRole = 'owner' | 'admin' | 'member'
+
 export interface User {
   id: string
   tenant_id: string
   email: string
   name: string
   avatar_url: string
-  role: 'owner' | 'admin' | 'member'
+  role: UserRole
   language?: AppLanguage
   created_at: string
+}
+
+export interface TenantSummary {
+  tenant_id: string
+  tenant_name: string
+  tenant_slug: string
+  role: UserRole
+  status: 'active' | 'inactive'
+  is_active: boolean
+}
+
+export interface AuthTenantsResponse {
+  tenants: TenantSummary[]
+  active_tenant_id: string
+}
+
+export interface SwitchTenantResponse {
+  ok: boolean
+  active_tenant_id: string
+  role: UserRole
 }
 
 export interface UserPreferences {
@@ -69,4 +91,16 @@ export function isDevAuthEnabled(): boolean {
 
 export async function devLogin(email: string, name?: string): Promise<void> {
   await api.post('/auth/dev/login', { email, name })
+}
+
+export async function getAuthTenants(): Promise<AuthTenantsResponse> {
+  const { data } = await api.get<AuthTenantsResponse>('/auth/tenants')
+  return data
+}
+
+export async function switchTenant(tenantId: string): Promise<SwitchTenantResponse> {
+  const { data } = await api.post<SwitchTenantResponse>('/auth/switch-tenant', {
+    tenant_id: tenantId,
+  })
+  return data
 }

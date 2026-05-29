@@ -1,6 +1,7 @@
 import { LogOut } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/hooks/useAuth'
+import TenantSwitcher from '@/components/layout/TenantSwitcher'
 
 export default function Header({ title }: { title: string }) {
   const { user, logout } = useAuth()
@@ -11,6 +12,7 @@ export default function Header({ title }: { title: string }) {
       <h1 className="font-semibold text-gray-900">{title}</h1>
 
       <div className="flex items-center gap-4">
+        <TenantSwitcher />
         {user && (
           <div className="flex items-center gap-3">
             <img
